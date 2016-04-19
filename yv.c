@@ -17,6 +17,16 @@
 #define YV1210 5    /* 10 bpp YV12 */
 #define Y42210 6
 
+int Fmt2OverlayTbl[] = {
+    [YV12] = SDL_YV12_OVERLAY,
+    [YV1210] = SDL_YV12_OVERLAY,
+    [IYUV] = SDL_IYUV_OVERLAY,
+    [YUY2] = SDL_YUY2_OVERLAY,
+    [UYVY] = SDL_UYVY_OVERLAY,
+    [YVYU] = SDL_YVYU_OVERLAY,
+    [Y42210] = SDL_YVYU_OVERLAY,
+};
+
 /* IPC */
 #define NONE 0
 #define MASTER 1
@@ -72,6 +82,7 @@ void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
+Uint32 guess_arg(char *filename, Uint32 *pWidth, Uint32 *pHeight, Uint32 *pFmt);
 
 SDL_Surface *screen;
 SDL_Event event;
@@ -420,6 +431,7 @@ void usage(char* name)
 {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%s filename width height format [diff_filename]\n", name);
+    fprintf(stderr, "\tformat=[YV12, IYUV, YUVY, UYVY, YUY2, YV1210, Y42210]\n");
 }
 
 void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch)
@@ -1061,11 +1073,68 @@ Uint32 event_loop(void)
     return quit;
 }
 
+typedef struct StrFmt {
+    char *str;
+    int fmt;
+} StrFmt;
+
+StrFmt sfTbl[] = {
+    {.str = "YV12", .fmt = YV12},
+    {.str = "NV12", .fmt = YV12},
+    {.str = "YUV420SP", .fmt = YV12},
+    {.str = "IYUV", .fmt = IYUV},
+    {.str = "YUY2", .fmt = YUY2},
+    {.str = "UYVY", .fmt = UYVY},
+    {.str = "YUV422", .fmt = UYVY},
+    {.str = "YVYU", .fmt = YVYU},
+    {.str = "YV1210", .fmt = YV1210},
+    {.str = "Y42210", .fmt = Y42210},
+};
+
+Uint32 guess_arg(char *filename,
+                 Uint32 *pWidth, Uint32 *pHeight, Uint32 *pFmt) {
+    char *s = filename;
+    int i;
+    for (i = 0; s[i] != '\0' && !isdigit(s[i]); i++) {
+    }
+    if (s[i] == '\0') {
+        fprintf(stderr, "cannot find widht\n");
+        return 0;
+    }
+    int width = strtol(s + i, &s, 10);
+    for (i = 0; s[i] != '\0' && !isdigit(s[i]); i++) {
+    }
+    if (s[i] == '\0') {
+        fprintf(stderr, "cannot find height\n");
+        return 0;
+    }
+    int height = strtol(s + i, &s, 10);
+    int fmt = -1;
+    char *retptr;
+    for (i = 0; i != sizeof(sfTbl) / sizeof(sfTbl[0]); i++) {
+        retptr = strcasestr(filename, sfTbl[i].str);
+        if (retptr != NULL) {
+            fmt = sfTbl[i].fmt;
+            break;
+        }
+    }
+    if (fmt == -1) {
+        fprintf(stderr, "cannot find fmt\n");
+        return 0;
+    }
+    *pWidth = width;
+    *pHeight = height;
+    *pFmt = fmt;
+    printf("guess width=%d height=%d fmt=%d(%s)\n", width, height, fmt, retptr);
+    return 1;
+}
+
 Uint32 parse_input(int argc, char **argv)
 {
-    if (argc != 5 && argc != 6) {
-        usage(argv[0]);
-        return 0;
+    if (argc == 2 && guess_arg(argv[1], &P.width, &P.height, &FORMAT)) {
+        P.filename = argv[1];
+        P.overlay_format = Fmt2OverlayTbl[FORMAT];
+        return 1;
     }
 
     if (argc == 6) {
@@ -1074,46 +1143,42 @@ Uint32 parse_input(int argc, char **argv)
         P.fname_diff = argv[5];
     }
 
-    P.filename = argv[1];
-
-    P.width = atoi(argv[2]);
-    P.height = atoi(argv[3]);
-
-    if (!strncmp(argv[4], "YV1210", 6)) {
-        P.overlay_format = SDL_YV12_OVERLAY;
-        FORMAT = YV1210;
-    } else if (!strncmp(argv[4], "YV12", 4)) {
-        P.overlay_format = SDL_YV12_OVERLAY;
-        FORMAT = YV12;
-    } else if (!strncmp(argv[4], "IYUV", 4)) {
-        P.overlay_format = SDL_IYUV_OVERLAY;
-        FORMAT = IYUV;
-    } else if (!strncmp(argv[4], "YUY2", 4)) {
-        P.overlay_format = SDL_YUY2_OVERLAY;
-        FORMAT = YUY2;
-    } else if (!strncmp(argv[4], "UYVY", 4)) {
-        P.overlay_format = SDL_UYVY_OVERLAY;
-        FORMAT = UYVY;
-    } else if (!strncmp(argv[4], "YVYU", 4)) {
-        P.overlay_format = SDL_YVYU_OVERLAY;
-        FORMAT = YVYU;
-    } else if (!strncmp(argv[4], "Y42210", 6)) {
-        /* No support for 422, display it as YVYU */
-        P.overlay_format = SDL_YVYU_OVERLAY;
-        FORMAT = Y42210;
-    } else {
-        fprintf(stderr, "The format option '%s' is not recognized\n", argv[4]);
-        return 0;
+    if (argc == 5 || argc == 6) {
+        P.filename = argv[1];
+        P.width = atoi(argv[2]);
+        P.height = atoi(argv[3]);
+        if (!strncmp(argv[4], "YV1210", 6)) {
+            FORMAT = YV1210;
+        } else if (!strncmp(argv[4], "YV12", 4)) {
+            FORMAT = YV12;
+        } else if (!strncmp(argv[4], "IYUV", 4)) {
+            FORMAT = IYUV;
+        } else if (!strncmp(argv[4], "YUY2", 4)) {
+            FORMAT = YUY2;
+        } else if (!strncmp(argv[4], "UYVY", 4)) {
+            FORMAT = UYVY;
+        } else if (!strncmp(argv[4], "YVYU", 4)) {
+            FORMAT = YVYU;
+        } else if (!strncmp(argv[4], "Y42210", 6)) {
+            /* No support for 422, display it as YVYU */
+            FORMAT = Y42210;
+        } else {
+            fprintf(stderr, "The format option '%s' is not recognized\n", argv[4]);
+            return 0;
+        }
+        P.overlay_format = Fmt2OverlayTbl[FORMAT];
+        return 1;
     }
 
-    return 1;
+    usage(argv[0]);
+    return 0;
 }
 
 Uint32 open_input(void)
 {
     fd = fopen(P.filename, "rb");
     if (fd == NULL) {
-        fprintf(stderr, "Error opening %s\n", P.filename);
+        fprintf(stderr, "Error opening file=%s\n", P.filename);
         return 0;
     }
 
@@ -1179,11 +1244,11 @@ int main(int argc, char** argv)
     /* Initialize parameters corresponding to YUV-format */
     setup_param();
 
-    if (!sdl_init()) {
+    if (!open_input()) {
         return EXIT_FAILURE;
     }
 
-    if (!open_input()) {
+    if (!sdl_init()) {
         return EXIT_FAILURE;
     }
 
