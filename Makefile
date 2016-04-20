@@ -8,6 +8,7 @@ LDFLAGS    = $(SDL_LIBS) #-lefence
 SRC        = yv.c
 TARGET     = yv
 OBJ        = $(SRC:.c=.o)
+INSTALLDIR = $(HOME)/.local/bin
 
 default: $(TARGET)
 
@@ -19,3 +20,7 @@ $(TARGET): $(OBJ)
 
 clean:
 	rm $(OBJ) $(TARGET)
+
+install:
+	[ -d $(INSTALLDIR) ] || mkdir $(INSTALLDIR)
+	mv yv $(INSTALLDIR)
