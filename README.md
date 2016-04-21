@@ -91,10 +91,10 @@ Supported commands
     m - Enable MB-mode, point and click to
         print MB-data to stdout
     h - histogram, 1 per color plane
-    F5 - Toggle viewing of Luma data only
-    F6 - Toggle viewing of Cb data only
-    F7 - Toggle viewing of Cr data only
-    F8 - Display all color-planes
+    F5/y - Toggle viewing of Luma data only
+    F6/u - Toggle viewing of Cb data only
+    F7/v - Toggle viewing of Cr data only
+    F8/a - Display all color-planes
     q - Quit
     F1 - MASTER-mode
     F2 - SLAVE-mode

@@ -988,6 +988,7 @@ Uint32 event_loop(void)
                         draw_frame();
                         break;
                     case SDLK_F5: /* Luma data only */
+                    case SDLK_y:
                         P.y_only = ~P.y_only;
                         P.cb_only = 0;
                         P.cr_only = 0;
@@ -995,6 +996,7 @@ Uint32 event_loop(void)
                         send_message(Y_ONLY);
                         break;
                     case SDLK_F6: /* Cb data only */
+                    case SDLK_u:
                         P.cb_only = ~P.cb_only;
                         P.y_only = 0;
                         P.cr_only = 0;
@@ -1002,6 +1004,7 @@ Uint32 event_loop(void)
                         send_message(CB_ONLY);
                         break;
                     case SDLK_F7: /* Cr data only */
+                    case SDLK_v:
                         P.cr_only = ~P.cr_only;
                         P.y_only = 0;
                         P.cb_only = 0;
@@ -1009,6 +1012,7 @@ Uint32 event_loop(void)
                         draw_frame();
                         break;
                     case SDLK_F8: /* display all color planes */
+                    case SDLK_a:
                         P.y_only = 0;
                         P.cb_only = 0;
                         P.cr_only = 0;
@@ -1141,19 +1145,20 @@ Uint32 parse_input(int argc, char **argv)
         P.filename = argv[1];
         P.width = atoi(argv[2]);
         P.height = atoi(argv[3]);
-        if (!strncmp(argv[4], "YV1210", 6)) {
+        char *fmt = argv[4];
+        if (!strncasecmp(fmt, "YV1210", 6)) {
             FORMAT = YV1210;
-        } else if (!strncmp(argv[4], "YV12", 4)) {
+        } else if (!strncasecmp(fmt, "YV12", 4)) {
             FORMAT = YV12;
-        } else if (!strncmp(argv[4], "IYUV", 4)) {
+        } else if (!strncasecmp(fmt, "IYUV", 4)) {
             FORMAT = IYUV;
-        } else if (!strncmp(argv[4], "YUY2", 4)) {
+        } else if (!strncasecmp(fmt, "YUY2", 4)) {
             FORMAT = YUY2;
-        } else if (!strncmp(argv[4], "UYVY", 4)) {
+        } else if (!strncasecmp(fmt, "UYVY", 4)) {
             FORMAT = UYVY;
-        } else if (!strncmp(argv[4], "YVYU", 4)) {
+        } else if (!strncasecmp(fmt, "YVYU", 4)) {
             FORMAT = YVYU;
-        } else if (!strncmp(argv[4], "Y42210", 6)) {
+        } else if (!strncasecmp(fmt, "Y42210", 6)) {
             /* No support for 422, display it as YVYU */
             FORMAT = Y42210;
         } else {
