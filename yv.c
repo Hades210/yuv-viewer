@@ -46,6 +46,7 @@ int Fmt2OverlayTbl[] = {
 
 /* PROTOTYPES */
 Uint32 rd(Uint8* data, Uint32 size);
+Uint32 read_planar(void);
 Uint32 read_yv12(void);
 Uint32 read_iyuv(void);
 Uint32 read_422(void);
@@ -150,23 +151,16 @@ Uint32 rd(Uint8* data, Uint32 size)
     return 1;
 }
 
-Uint32 read_yv12(void)
+Uint32 read_planar(void)
 {
     if (!rd(P.y_data, P.y_size)) return 0;
     if (!rd(P.cb_data, P.cb_size)) return 0;
     if (!rd(P.cr_data, P.cr_size)) return 0;
-
     return 1;
 }
 
-Uint32 read_iyuv(void)
-{
-    if (!rd(P.y_data, P.y_size)) return 0;
-    if (!rd(P.cb_data, P.cb_size)) return 0;
-    if (!rd(P.cr_data, P.cr_size)) return 0;
-
-    return 1;
-}
+Uint32 read_yv12(void) { return read_planar(); }
+Uint32 read_iyuv(void) { return read_planar(); }
 
 Uint32 read_422(void)
 {
@@ -1098,7 +1092,7 @@ Uint32 guess_arg(char *filename,
     for (i = 0; s[i] != '\0' && !isdigit(s[i]); i++) {
     }
     if (s[i] == '\0') {
-        fprintf(stderr, "cannot find widht\n");
+        fprintf(stderr, "cannot find width\n");
         return 0;
     }
     int width = strtol(s + i, &s, 10);
