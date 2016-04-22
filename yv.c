@@ -8,25 +8,6 @@
 
 #include "SDL.h"
 
-/* Supported YUV-formats */
-#define YV12 0
-#define IYUV 1
-#define YUY2 2
-#define UYVY 3
-#define YVYU 4
-#define YV1210 5    /* 10 bpp YV12 */
-#define Y42210 6
-
-int Fmt2OverlayTbl[] = {
-    [YV12] = SDL_YV12_OVERLAY,
-    [YV1210] = SDL_YV12_OVERLAY,
-    [IYUV] = SDL_IYUV_OVERLAY,
-    [YUY2] = SDL_YUY2_OVERLAY,
-    [UYVY] = SDL_UYVY_OVERLAY,
-    [YVYU] = SDL_YVYU_OVERLAY,
-    [Y42210] = SDL_YVYU_OVERLAY,
-};
-
 /* IPC */
 #define NONE 0
 #define MASTER 1
@@ -52,14 +33,16 @@ Uint32 read_iyuv(void);
 Uint32 read_422(void);
 Uint32 read_y42210(void);
 Uint32 read_yv1210(void);
+Uint32 read_yuv420sp(void);
 Uint32 allocate_memory(void);
 void draw_grid422(void);
 void draw_grid420(void);
 void luma_only(void);
 void cb_only(void);
 void cr_only(void);
-void draw_420(void);
+void draw_yv12(void);
 void draw_422(void);
+void draw_420sp(void);
 Uint32 diff_mode(void);
 void calc_psnr(Uint8* frame0, Uint8* frame1);
 void usage(char* name);
@@ -84,6 +67,43 @@ void set_zoom_rect(void);
 void histogram(void);
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
 Uint32 guess_arg(char *filename, Uint32 *pWidth, Uint32 *pHeight, Uint32 *pFmt);
+
+/* Supported YUV-formats */
+enum {
+    YV12=0,
+    IYUV=1,
+    YUY2=2,
+    UYVY=3,
+    YVYU=4,
+    YV1210=5,    /* 10 bpp YV12 */
+    Y42210=6,
+    YUV420SP=7,
+};
+
+int Fmt2OverlayTbl[] = {
+    [YV12] = SDL_YV12_OVERLAY,
+    [YV1210] = SDL_YV12_OVERLAY,
+    [IYUV] = SDL_IYUV_OVERLAY,
+    [YUY2] = SDL_YUY2_OVERLAY,
+    [UYVY] = SDL_UYVY_OVERLAY,
+    [YVYU] = SDL_YVYU_OVERLAY,
+    [Y42210] = SDL_YVYU_OVERLAY,
+    [YUV420SP] = SDL_YV12_OVERLAY,
+};
+Uint32 (*reader[])(void) = {
+    read_yv12,
+    read_iyuv,
+    read_422,
+    read_422,
+    read_422,
+    read_yv1210,
+    read_y42210,
+    read_yuv420sp
+    // read_yv12,
+};
+void (*drawer[])(void) = {draw_yv12, draw_yv12, draw_422, draw_422, draw_422, draw_yv12, draw_422,
+draw_yv12};
+
 
 SDL_Surface *screen;
 SDL_Event event;
@@ -161,6 +181,21 @@ Uint32 read_planar(void)
 
 Uint32 read_yv12(void) { return read_planar(); }
 Uint32 read_iyuv(void) { return read_planar(); }
+
+Uint32 read_yuv420sp(void)
+{
+    if (!rd(P.y_data, P.y_size)) return 0;
+
+    if (!rd(P.raw, P.cb_size + P.cr_size)) return 0;
+    Uint8 *cb = P.cb_data, *cr = P.cr_data;
+    for (Uint32 i = 0; i < P.cb_size; i++) {
+        *cb++ = P.raw[i * 2];
+    }
+    for (Uint32 i = 0; i < P.cr_size; i++) {
+        *cr++ = P.raw[i * 2 + 1];
+    }
+    return 1;
+}
 
 Uint32 read_422(void)
 {
@@ -339,7 +374,7 @@ void luma_only(void)
         return;
     }
 
-    if (FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
+    if (FORMAT == YUV420SP || FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
         /* Set croma part to 0x80 */
         for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
         for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
@@ -361,7 +396,7 @@ void cb_only(void)
         return;
     }
 
-    if (FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
+    if (FORMAT == YUV420SP || FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
         /* Set Luma part and Cr to 0x80 */
         for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
         for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
@@ -383,7 +418,7 @@ void cr_only(void)
         return;
     }
 
-    if (FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
+    if (FORMAT == YUV420SP || FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
         /* Set Luma part and Cb to 0x80 */
         for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
         for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
@@ -399,33 +434,42 @@ void cr_only(void)
     }
 }
 
-void draw_420(void)
+void post_draw(void) {
+    luma_only();
+    cb_only();
+    cr_only();
+    histogram();
+}
+
+void draw_420sp(void) {
+    memcpy(my_overlay->pixels[0], P.y_data, P.y_size);
+    memcpy(my_overlay->pixels[1], P.cb_data, P.cb_size);
+    memcpy(my_overlay->pixels[2], P.cr_data, P.cr_size);
+    draw_grid420();
+    post_draw();
+}
+
+void draw_yv12(void)
 {
     memcpy(my_overlay->pixels[0], P.y_data, P.y_size);
     memcpy(my_overlay->pixels[1], P.cr_data, P.cr_size);
     memcpy(my_overlay->pixels[2], P.cb_data, P.cb_size);
     draw_grid420();
-    luma_only();
-    cb_only();
-    cr_only();
-    histogram();
+    post_draw();
 }
 
 void draw_422(void)
 {
     memcpy(my_overlay->pixels[0], P.raw, P.frame_size);
     draw_grid422();
-    luma_only();
-    cb_only();
-    cr_only();
-    histogram();
+    post_draw();
 }
 
 void usage(char* name)
 {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%s filename width height format [diff_filename]\n", name);
-    fprintf(stderr, "\tformat=[YV12, IYUV, YUVY, UYVY, YUY2, YV1210, Y42210]\n");
+    fprintf(stderr, "\tformat=[YV12, IYUV, YUVY, UYVY, YUY2, YV1210, Y42210, YUV420SP]\n");
 }
 
 void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch)
@@ -470,12 +514,16 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
     fflush(stdout);
 }
 
-Uint32 (*reader[])(void) = {read_yv12, read_iyuv, read_422, read_422, read_422, read_yv1210, read_y42210};
-void (*drawer[])(void) = {draw_420, draw_420, draw_422, draw_422, draw_422, draw_420, draw_422};
+#define precheck_range(index, array) \
+    if (index >= sizeof(array) / sizeof(array[0])) { \
+        fprintf(stderr, "index=%d out of range\n", index); \
+        exit(-1); \
+    }
 
 void draw_frame(void)
 {
     SDL_LockYUVOverlay(my_overlay);
+    precheck_range(FORMAT, drawer);
     (*drawer[FORMAT])();
     set_zoom_rect();
     video_rect.x = 0;
@@ -489,6 +537,7 @@ void draw_frame(void)
 Uint32 read_frame(void)
 {
     if (!P.diff) {
+        precheck_range(FORMAT, reader);
         return (*reader[FORMAT])();
     } else {
         return diff_mode();
@@ -619,11 +668,13 @@ void setup_param(void)
     P.zoom = 1;
     P.wh = P.width * P.height;
 
-    if (FORMAT == YV12 || FORMAT == IYUV) {
+    if (FORMAT == YV12 || FORMAT == IYUV || FORMAT == YUV420SP) {
         P.frame_size = P.wh * 3 / 2;
         P.y_size = P.wh;
         P.cb_size = P.wh / 4;
         P.cr_size = P.wh / 4;
+        printf("format=%d bpp=%f frame_size=%d y_size=%d cb_size=%d cr_size=%d\n",
+               FORMAT, 1.5, P.frame_size, P.y_size, P.cb_size, P.cr_size);
     } else if (FORMAT == YUY2 || FORMAT == UYVY || FORMAT == YVYU || FORMAT == Y42210) {
         P.grid_start_pos = 0;
         P.frame_size = P.wh * 2;
@@ -1079,7 +1130,7 @@ typedef struct StrFmt {
 StrFmt sfTbl[] = {
     {.str = "YV12", .fmt = YV12},
     {.str = "NV12", .fmt = YV12},
-    {.str = "YUV420SP", .fmt = YV12},
+    {.str = "YUV420SP", .fmt = YUV420SP},
     {.str = "IYUV", .fmt = IYUV},
     {.str = "YUY2", .fmt = YUY2},
     {.str = "UYVY", .fmt = UYVY},
@@ -1131,17 +1182,13 @@ Uint32 parse_input(int argc, char **argv)
 {
     if (argc == 2 && guess_arg(argv[1], &P.width, &P.height, &FORMAT)) {
         P.filename = argv[1];
-        P.overlay_format = Fmt2OverlayTbl[FORMAT];
-        return 1;
-    }
+    } else if (argc == 5 || argc == 6) {
+        if (argc == 6) {
+            /* diff mode */
+            P.diff = 1;
+            P.fname_diff = argv[5];
+        }
 
-    if (argc == 6) {
-        /* diff mode */
-        P.diff = 1;
-        P.fname_diff = argv[5];
-    }
-
-    if (argc == 5 || argc == 6) {
         P.filename = argv[1];
         P.width = atoi(argv[2]);
         P.height = atoi(argv[3]);
@@ -1161,16 +1208,21 @@ Uint32 parse_input(int argc, char **argv)
         } else if (!strncasecmp(fmt, "Y42210", 6)) {
             /* No support for 422, display it as YVYU */
             FORMAT = Y42210;
+        } else if (!strncasecmp(fmt, "YUV420SP", 8) || !strncasecmp(fmt, "NV12", 4)) {
+            FORMAT = YUV420SP;
         } else {
             fprintf(stderr, "The format option '%s' is not recognized\n", argv[4]);
             return 0;
         }
-        P.overlay_format = Fmt2OverlayTbl[FORMAT];
-        return 1;
+    } else {
+        usage(argv[0]);
+        return 0;
     }
-
-    usage(argv[0]);
-    return 0;
+    precheck_range(FORMAT, Fmt2OverlayTbl);
+    P.overlay_format = Fmt2OverlayTbl[FORMAT];
+    printf("raw FORMAT=%d show overlay_format=%d(%#x)\n",
+           FORMAT, P.overlay_format, P.overlay_format);
+    return 1;
 }
 
 Uint32 open_input(void)
@@ -1226,6 +1278,8 @@ Uint32 sdl_init(void)
         fprintf(stderr, "Couldn't create overlay\n");
         return 0;
     }
+    printf("create yuv overlay %dx%d with format=%d\n",
+           P.width, P.height, P.overlay_format);
     return 1;
 }
 
