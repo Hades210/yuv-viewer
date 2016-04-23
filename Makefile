@@ -24,3 +24,6 @@ clean:
 install:
 	[ -d $(INSTALLDIR) ] || mkdir $(INSTALLDIR)
 	mv yv $(INSTALLDIR)
+
+test: yv
+	./yv cif.yuv 352 288 nv12

@@ -8,6 +8,23 @@
 
 #include "SDL.h"
 
+#define DEBUG
+#ifdef DEBUG
+#define LOG(fmt, ...) fprintf(stderr, "%s:%d "fmt, \
+                              __FUNCTION__, __LINE__, __VA_ARGS__)
+#else
+#define LOG(fmt, ...)
+#endif
+#define DIE(...)      fprintf(stderr, __VA_ARGS__)
+
+#define COUNT_OF(a) (sizeof(a) / sizeof(a[0]))
+#define precheck_range(index, array) \
+    if (index >= sizeof(array) / sizeof(array[0])) { \
+        DIE("index=%d out of range\n", index); \
+        exit(-1); \
+    }
+
+
 /* IPC */
 #define NONE 0
 #define MASTER 1
@@ -28,8 +45,6 @@
 /* PROTOTYPES */
 Uint32 rd(Uint8* data, Uint32 size);
 Uint32 read_planar(void);
-Uint32 read_yv12(void);
-Uint32 read_iyuv(void);
 Uint32 read_422(void);
 Uint32 read_y42210(void);
 Uint32 read_yv1210(void);
@@ -70,7 +85,7 @@ void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
-Uint32 guess_arg(char *filename, Uint32 *pWidth, Uint32 *pHeight, Uint32 *pFmt);
+Uint32 guess_arg(char *filename);
 
 /* Supported YUV-formats */
 enum {
@@ -84,30 +99,23 @@ enum {
     YUV420SP=7,
 };
 
-int Fmt2OverlayTbl[] = {
-    [YV12] = SDL_YV12_OVERLAY,
-    [YV1210] = SDL_YV12_OVERLAY,
-    [IYUV] = SDL_IYUV_OVERLAY,
-    [YUY2] = SDL_YUY2_OVERLAY,
-    [UYVY] = SDL_UYVY_OVERLAY,
-    [YVYU] = SDL_YVYU_OVERLAY,
-    [Y42210] = SDL_YVYU_OVERLAY,
-    [YUV420SP] = SDL_YV12_OVERLAY,
-};
-Uint32 (*reader[])(void) = {
-    read_yv12,
-    read_iyuv,
-    read_422,
-    read_422,
-    read_422,
-    read_yv1210,
-    read_y42210,
-    read_yuv420sp
-    // read_yv12,
-};
-void (*drawer[])(void) = {draw_yv12, draw_yv12, draw_422, draw_422, draw_422, draw_yv12, draw_422,
-draw_yv12};
+typedef struct {
+    int overlay_fmt;
+    Uint32 (*reader)(void);
+    void (*drawer)(void);
+    char *fmtNameLst;
+} FmtMap;
 
+FmtMap gFmtMap[] = {
+    [YV12] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "yv12"},
+    [IYUV] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "iyuv"},
+    [YUY2] = {SDL_YUY2_OVERLAY, read_422, draw_422, "yuy2"},
+    [UYVY] = {SDL_UYVY_OVERLAY, read_422, draw_422, "uyvy"},
+    [YVYU] = {SDL_YVYU_OVERLAY, read_422, draw_422, "yvyu"},
+    [YV1210] = {SDL_YV12_OVERLAY, read_yv1210, draw_yv12, "yv1210"},
+    [Y42210] = {SDL_YVYU_OVERLAY, read_y42210, draw_422, "y42210"},
+    [YUV420SP] = {SDL_YV12_OVERLAY, read_yuv420sp, draw_yv12, "yuv420sp nv12"},
+};
 
 SDL_Surface *screen;
 SDL_Event event;
@@ -169,7 +177,7 @@ Uint32 rd(Uint8* data, Uint32 size)
 
     cnt = fread(data, sizeof(Uint8), size, fd);
     if (cnt < size) {
-        fprintf(stderr, "No more data to read!\n");
+        DIE("No more data to read!\n");
         return 0;
     }
     return 1;
@@ -182,9 +190,6 @@ Uint32 read_planar(void)
     if (!rd(P.cr_data, P.cr_size)) return 0;
     return 1;
 }
-
-Uint32 read_yv12(void) { return read_planar(); }
-Uint32 read_iyuv(void) { return read_planar(); }
 
 Uint32 read_yuv420sp(void)
 {
@@ -223,13 +228,13 @@ Uint32 read_y42210(void)
 
     data = malloc(sizeof(Uint8) * P.frame_size * 2);
     if (!data) {
-        fprintf(stderr, "Error allocating memory...\n");
+        DIE("Error allocating memory...\n");
         return 0;
     }
 
     tmp = malloc(sizeof(Uint8) * P.frame_size);
     if (!tmp) {
-        fprintf(stderr, "Error allocating memory...\n");
+        DIE("Error allocating memory...\n");
         ret = 0;
         goto cleany42210;
     }
@@ -270,7 +275,7 @@ Uint32 read_yv1210(void)
 
     data = malloc(sizeof(Uint8) * P.y_size * 2);
     if (!data) {
-        fprintf(stderr, "Error allocating memory...\n");
+        DIE("Error allocating memory...\n");
         return 0;
     }
 
@@ -331,7 +336,7 @@ Uint32 allocate_memory(void)
     P.cr_data = malloc(sizeof(Uint8) * P.cr_size);
 
     if (!P.raw || !P.y_data || !P.cb_data || !P.cr_data) {
-        fprintf(stderr, "Error allocating memory...\n");
+        DIE("Error allocating memory...\n");
         check_free_memory();
         return 0;
     }
@@ -482,8 +487,20 @@ void draw_422(void)
 void usage(char* name)
 {
     fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "%s filename width height format [diff_filename]\n", name);
-    fprintf(stderr, "\tformat=[YV12, IYUV, YUVY, UYVY, YUY2, YV1210, Y42210, YUV420SP]\n");
+    fprintf(stderr, "%s filename [width height format [diff_filename]]\n", name);
+    fprintf(stderr, "\twhen only have filename arg,"
+            " try guess other arg from filename\n");
+    fprintf(stderr, "\tformat=[");
+    char *s;
+    for (Uint32 i = 0; i != COUNT_OF(gFmtMap); i++) {
+        if (i == 0) {
+            s = "%s";
+        } else {
+            s = ", %s";
+        }
+        fprintf(stderr, s, gFmtMap[i].fmtNameLst);
+    }
+    fprintf(stderr, "]\n");
 }
 
 void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch)
@@ -528,17 +545,11 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
     fflush(stdout);
 }
 
-#define precheck_range(index, array) \
-    if (index >= sizeof(array) / sizeof(array[0])) { \
-        fprintf(stderr, "index=%d out of range\n", index); \
-        exit(-1); \
-    }
-
 void draw_frame(void)
 {
     SDL_LockYUVOverlay(my_overlay);
-    precheck_range(FORMAT, drawer);
-    (*drawer[FORMAT])();
+    precheck_range(FORMAT, gFmtMap);
+    (gFmtMap[FORMAT].drawer)();
     set_zoom_rect();
     video_rect.x = 0;
     video_rect.y = 0;
@@ -551,8 +562,8 @@ void draw_frame(void)
 Uint32 read_frame(void)
 {
     if (!P.diff) {
-        precheck_range(FORMAT, reader);
-        return (*reader[FORMAT])();
+        precheck_range(FORMAT, gFmtMap);
+        return (gFmtMap[FORMAT].reader)();
     } else {
         return diff_mode();
     }
@@ -574,14 +585,15 @@ Uint32 diff_mode(void)
      * from correct file.
      */
 
-    if (!(*reader[FORMAT])()) {
+    precheck_range(FORMAT, gFmtMap);
+    if (!(gFmtMap[FORMAT].reader)()) {
         return 0;
     }
 
     y_tmp = malloc(sizeof(Uint8) * P.y_size);
 
     if (!y_tmp) {
-        fprintf(stderr, "Error allocating memory...\n");
+        DIE("Error allocating memory...\n");
         return 0;
     }
 
@@ -592,7 +604,8 @@ Uint32 diff_mode(void)
     fd_tmp = fd;
     fd = P.fd2;
 
-    if (!(*reader[FORMAT])()) {
+    precheck_range(FORMAT, gFmtMap);
+    if (!(gFmtMap[FORMAT].reader)()) {
         free(y_tmp);
         fd = fd_tmp;
         return 0;
@@ -732,10 +745,10 @@ void check_input(void)
 
     /* Frame Size is an even multipe of 16x16? */
     if (P.width % 16 != 0) {
-        fprintf(stderr, "WIDTH not multiple of 16, check input...\n");
+        DIE("WIDTH not multiple of 16, check input...\n");
     }
     if (P.height % 16 != 0) {
-        fprintf(stderr, "HEIGHT not multiple of 16, check input...\n");
+        DIE("HEIGHT not multiple of 16, check input...\n");
     }
 
     /* Even number of frames? */
@@ -744,7 +757,7 @@ void check_input(void)
     fseek(fd, 0L, SEEK_SET);
 
     if (file_size % P.frame_size != 0) {
-        fprintf(stderr, "#FRAMES not an integer, check input...\n");
+        DIE("#FRAMES not an integer, check input...\n");
     }
 }
 
@@ -891,7 +904,7 @@ Uint32 event_dispatcher(void)
                 break;
 
             default:
-                fprintf(stderr, "~TILT\n");
+                DIE("~TILT\n");
                 return 0;
         }
     }
@@ -925,13 +938,13 @@ void set_zoom_rect(void)
         P.zoom_width = P.width / (abs(P.zoom) + 2);
         P.zoom_height = P.height / (abs(P.zoom) + 2);
     } else {
-        fprintf(stderr, "ERROR in zoom:\n");
+        DIE("ERROR in zoom:\n");
     }
 }
 
 Uint32 redraw(void)
 {
-    fseek(fd, -0, SEEK_SET);
+    fseek(fd, 0, SEEK_SET);
     if (P.diff) {
         fseek(P.fd2, 0, SEEK_SET);
     }
@@ -1167,60 +1180,107 @@ typedef struct StrFmt {
     int fmt;
 } StrFmt;
 
-StrFmt sfTbl[] = {
-    {.str = "YV12", .fmt = YV12},
-    {.str = "NV12", .fmt = YV12},
-    {.str = "YUV420SP", .fmt = YUV420SP},
-    {.str = "IYUV", .fmt = IYUV},
-    {.str = "YUY2", .fmt = YUY2},
-    {.str = "UYVY", .fmt = UYVY},
-    {.str = "YUV422", .fmt = UYVY},
-    {.str = "YVYU", .fmt = YVYU},
-    {.str = "YV1210", .fmt = YV1210},
-    {.str = "Y42210", .fmt = Y42210},
-};
+int strfmtcmp(const void *p0, const void *p1) {
+    char *s0 = ((StrFmt *)p0)->str;
+    char *s1 = ((StrFmt *)p1)->str;
+    int l0 = strlen(s0);
+    int l1 = strlen(s1);
+    if (l0 != l1) {
+        return l0 - l1;
+    }
+    return strcmp(s0, s1);
+}
 
-Uint32 guess_arg(char *filename,
-                 Uint32 *pWidth, Uint32 *pHeight, Uint32 *pFmt) {
+int strfmtcmp_r(const void *p0, const void *p1) {
+    return -1 * strfmtcmp(p0, p1);
+}
+
+static char **gNameLst;
+StrFmt *buildStrFmtLst(int *pLen) {
+    Uint32 ft = 0, len = COUNT_OF(gFmtMap);
+    gNameLst = malloc(sizeof(char *) * len);
+    for (ft = 0; ft != len; ft++) {
+        gNameLst[ft] = strdup(gFmtMap[ft].fmtNameLst);
+    }
+
+    int toklen = 2 * len, tokidx;
+    char delim[] = " ";
+    char *s, *token;
+    StrFmt *toklst = malloc(sizeof(StrFmt) * toklen);
+    memset(toklst, 0, sizeof(StrFmt) * toklen);
+    for (ft = tokidx = 0; ft != len; ft++) {
+        s = gNameLst[ft];
+        while ((token = strtok(s, delim)) != NULL) {
+            s = NULL;
+            toklst[tokidx].str = token;
+            toklst[tokidx].fmt = ft;
+            tokidx++;
+            if (tokidx > toklen) {
+                DIE("not enough toklst, toklen=%d\n", toklen);
+                goto cleanup;
+            }
+        }
+    }
+    *pLen = tokidx;
+    return toklst;
+cleanup:
+    *pLen = 0;
+    return NULL;
+}
+
+void destoryStrFmtLst() {
+    for (int ft = 0; ft != COUNT_OF(gFmtMap); ft++) {
+        free(gNameLst[ft]);
+    }
+}
+Uint32 parse_format(char *fmtstr) {
+    FORMAT = -1;
+    int tokidx;
+    StrFmt *toklst = buildStrFmtLst(&tokidx);
+    qsort(toklst, tokidx, sizeof(StrFmt), strfmtcmp_r);
+    for (Uint32 i = 0; i != tokidx; i++) {
+        StrFmt *p = toklst + i;
+        if (strcasestr(fmtstr, p->str) != NULL) {
+            FORMAT = p->fmt;
+            goto cleanup;
+        }
+    }
+
+cleanup:
+    destoryStrFmtLst();
+    return FORMAT != -1;
+}
+Uint32 guess_arg(char *filename) {
     char *s = filename;
     int i;
     for (i = 0; s[i] != '\0' && !isdigit(s[i]); i++) {
     }
     if (s[i] == '\0') {
-        fprintf(stderr, "cannot find width\n");
+        DIE("cannot find width\n");
         return 0;
     }
     int width = strtol(s + i, &s, 10);
     for (i = 0; s[i] != '\0' && !isdigit(s[i]); i++) {
     }
     if (s[i] == '\0') {
-        fprintf(stderr, "cannot find height\n");
+        DIE("cannot find height\n");
         return 0;
     }
     int height = strtol(s + i, &s, 10);
-    int fmt = -1;
-    char *retptr;
-    for (i = 0; i != sizeof(sfTbl) / sizeof(sfTbl[0]); i++) {
-        retptr = strcasestr(filename, sfTbl[i].str);
-        if (retptr != NULL) {
-            fmt = sfTbl[i].fmt;
-            break;
-        }
-    }
-    if (fmt == -1) {
-        fprintf(stderr, "cannot find fmt\n");
+    parse_format(filename);
+    if (FORMAT == -1) {
+        DIE("cannot find fmt\n");
         return 0;
     }
-    *pWidth = width;
-    *pHeight = height;
-    *pFmt = fmt;
-    printf("guess width=%d height=%d fmt=%d(%s)\n", width, height, fmt, retptr);
+    P.width = width;
+    P.height = height;
+    printf("guess width=%d height=%d fmt=%d(%s)\n", width, height, FORMAT, gFmtMap[FORMAT].fmtNameLst);
     return 1;
 }
 
 Uint32 parse_input(int argc, char **argv)
 {
-    if (argc == 2 && guess_arg(argv[1], &P.width, &P.height, &FORMAT)) {
+    if (argc == 2 && guess_arg(argv[1])) {
         P.filename = argv[1];
     } else if (argc == 5 || argc == 6) {
         if (argc == 6) {
@@ -1233,35 +1293,22 @@ Uint32 parse_input(int argc, char **argv)
         P.width = atoi(argv[2]);
         P.height = atoi(argv[3]);
         char *fmt = argv[4];
-        if (!strncasecmp(fmt, "YV1210", 6)) {
-            FORMAT = YV1210;
-        } else if (!strncasecmp(fmt, "YV12", 4)) {
-            FORMAT = YV12;
-        } else if (!strncasecmp(fmt, "IYUV", 4)) {
-            FORMAT = IYUV;
-        } else if (!strncasecmp(fmt, "YUY2", 4)) {
-            FORMAT = YUY2;
-        } else if (!strncasecmp(fmt, "UYVY", 4)) {
-            FORMAT = UYVY;
-        } else if (!strncasecmp(fmt, "YVYU", 4)) {
-            FORMAT = YVYU;
-        } else if (!strncasecmp(fmt, "Y42210", 6)) {
-            /* No support for 422, display it as YVYU */
-            FORMAT = Y42210;
-        } else if (!strncasecmp(fmt, "YUV420SP", 8) || !strncasecmp(fmt, "NV12", 4)) {
-            FORMAT = YUV420SP;
-        } else {
-            fprintf(stderr, "The format option '%s' is not recognized\n", argv[4]);
+        parse_format(fmt);
+        if (FORMAT == -1) {
+            DIE("The format option '%s' is not recognized\n", fmt);
             return 0;
         }
     } else {
         usage(argv[0]);
         return 0;
     }
-    precheck_range(FORMAT, Fmt2OverlayTbl);
-    P.overlay_format = Fmt2OverlayTbl[FORMAT];
-    printf("raw FORMAT=%d show overlay_format=%d(%#x)\n",
-           FORMAT, P.overlay_format, P.overlay_format);
+    precheck_range(FORMAT, gFmtMap);
+    P.overlay_format = gFmtMap[FORMAT].overlay_fmt;
+    char *cc = (char *)&P.overlay_format;
+    printf("arg %dx%d FORMAT=%d(%s) show overlay_format=%#x(%c%c%c%c)\n",
+           P.width, P.height,
+           FORMAT, gFmtMap[FORMAT].fmtNameLst,
+           P.overlay_format, cc[0], cc[1], cc[2], cc[3]);
     return 1;
 }
 
@@ -1269,14 +1316,14 @@ Uint32 open_input(void)
 {
     fd = fopen(P.filename, "rb");
     if (fd == NULL) {
-        fprintf(stderr, "Error opening file=%s\n", P.filename);
+        DIE("Error opening file=%s\n", P.filename);
         return 0;
     }
 
     if (P.diff) {
         P.fd2 = fopen(P.fname_diff, "rb");
         if (P.fd2 == NULL) {
-            fprintf(stderr, "Error opening %s\n", P.fname_diff);
+            DIE("Error opening %s\n", P.fname_diff);
             return 0;
         }
     }
@@ -1287,14 +1334,14 @@ Uint32 sdl_init(void)
 {
     /* SDL init */
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "Unable to set video mode: %s\n", SDL_GetError());
+        DIE("Unable to set video mode: %s\n", SDL_GetError());
         atexit(SDL_Quit);
         return 0;
     }
 
     info = SDL_GetVideoInfo();
     if (!info) {
-        fprintf(stderr, "SDL ERROR Video query failed: %s\n", SDL_GetError());
+        DIE("SDL ERROR Video query failed: %s\n", SDL_GetError());
         SDL_Quit();
         return 0;
     }
@@ -1308,18 +1355,16 @@ Uint32 sdl_init(void)
     }
 
     if ((screen = SDL_SetVideoMode(P.width, P.height, P.bpp, P.vflags)) == 0) {
-        fprintf(stderr, "SDL ERROR Video mode set failed: %s\n", SDL_GetError());
+        DIE("SDL ERROR Video mode set failed: %s\n", SDL_GetError());
         SDL_Quit();
         return 0;
     }
 
     my_overlay = SDL_CreateYUVOverlay(P.width, P.height, P.overlay_format, screen);
     if (!my_overlay) {
-        fprintf(stderr, "Couldn't create overlay\n");
+        DIE("Couldn't create overlay\n");
         return 0;
     }
-    printf("create yuv overlay %dx%d with format=%d\n",
-           P.width, P.height, P.overlay_format);
     return 1;
 }
 

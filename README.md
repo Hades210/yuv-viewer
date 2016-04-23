@@ -5,7 +5,7 @@ Supports the following formats:
 
 - YV12
 - IYUV
-- YUVY
+- YVYU
 - UYVY
 - YUY2
 - YV1210
