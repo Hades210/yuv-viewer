@@ -3,7 +3,7 @@ OPTFLAGS   = -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes $(DBG) -peda
 SDL_LIBS   := $(shell sdl-config --static-libs)
 SDL_CFLAGS := $(shell sdl-config --cflags)
 CFLAGS     = $(OPTFLAGS)  $(SDL_CFLAGS) -std=c99
-LDFLAGS    = $(SDL_LIBS) #-lefence
+LDFLAGS    = $(SDL_LIBS) -lm #-lefence
 
 SRC        = yv.c
 TARGET     = yv
@@ -19,7 +19,7 @@ $(TARGET): $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LDFLAGS)
 
 clean:
-	rm $(OBJ) $(TARGET)
+	rm -rf $(OBJ) $(TARGET) core*
 
 install:
 	[ -d $(INSTALLDIR) ] || mkdir $(INSTALLDIR)

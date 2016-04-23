@@ -34,15 +34,18 @@ Uint32 read_422(void);
 Uint32 read_y42210(void);
 Uint32 read_yv1210(void);
 Uint32 read_yuv420sp(void);
+Uint32 check_free_memory(void);
 Uint32 allocate_memory(void);
 void draw_grid422(void);
 void draw_grid420(void);
 void luma_only(void);
 void cb_only(void);
 void cr_only(void);
+void post_draw(void);
 void draw_yv12(void);
 void draw_422(void);
 void draw_420sp(void);
+Uint32 redraw(void);
 Uint32 diff_mode(void);
 void calc_psnr(Uint8* frame0, Uint8* frame1);
 void usage(char* name);
@@ -62,6 +65,7 @@ Uint32 event_dispatcher(void);
 Uint32 event_loop(void);
 Uint32 parse_input(int argc, char **argv);
 Uint32 sdl_init(void);
+Uint32 reinit(void);
 void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
@@ -310,8 +314,17 @@ Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length)
     return 1;
 }
 
+Uint32 check_free_memory(void) {
+    if (P.raw != NULL) { free(P.raw); }
+    if (P.y_data != NULL) {free(P.y_data); }
+    if (P.cb_data != NULL) { free(P.cb_data); }
+    if (P.cr_data != NULL) { free(P.cr_data); }
+    return 1;
+}
+
 Uint32 allocate_memory(void)
 {
+    check_free_memory();
     P.raw = malloc(sizeof(Uint8) * P.frame_size);
     P.y_data = malloc(sizeof(Uint8) * P.y_size);
     P.cb_data = malloc(sizeof(Uint8) * P.cb_size);
@@ -319,6 +332,7 @@ Uint32 allocate_memory(void)
 
     if (!P.raw || !P.y_data || !P.cb_data || !P.cr_data) {
         fprintf(stderr, "Error allocating memory...\n");
+        check_free_memory();
         return 0;
     }
     return 1;
@@ -915,6 +929,27 @@ void set_zoom_rect(void)
     }
 }
 
+Uint32 redraw(void)
+{
+    fseek(fd, -0, SEEK_SET);
+    if (P.diff) {
+        fseek(P.fd2, 0, SEEK_SET);
+    }
+    read_frame();
+    draw_frame();
+    send_message(REW);
+    return 1;
+}
+
+Uint32 reinit(void)
+{
+    /* Initialize parameters corresponding to YUV-format */
+    setup_param();
+    if (!sdl_init()) { return 0; }
+    if (!allocate_memory()) { return 0; }
+    return 1;
+}
+
 /* loop inspired by yay
  * http://freecode.com/projects/yay
  */
@@ -1016,16 +1051,21 @@ Uint32 event_loop(void)
                         break;
                     case SDLK_r: /* rewind */
                         if (frame > 1) {
-                            frame = 1;
-                            fseek(fd, 0, SEEK_SET);
-                            if (P.diff) {
-                                fseek(P.fd2, 0, SEEK_SET);
-                            }
-                            read_frame();
-                            draw_frame();
-                            send_message(REW);
+                            redraw();
                         }
                         break;
+                    case SDLK_l:
+                        P.width += 16;
+                        frame = 1; reinit(); redraw(); break;
+                    case SDLK_h:
+                        P.width -= 16;
+                        frame = 1; reinit(); redraw(); break;
+                    case SDLK_j:
+                        P.height += 16;
+                        frame = 1; reinit(); redraw(); break;
+                    case SDLK_k:
+                        P.height -= 16;
+                        frame = 1; reinit(); redraw(); break;
                     case SDLK_g: /* display grid */
                         P.grid = ~P.grid;
                         if (P.zoom < 1)
@@ -1070,7 +1110,7 @@ Uint32 event_loop(void)
                         draw_frame();
                         send_message(ALL_PLANES);
                         break;
-                    case SDLK_h: /* histogram */
+                    case SDLK_s: /* histogram */
                         P.hist = ~P.hist;
                         draw_frame();
                         break;
@@ -1294,19 +1334,11 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    /* Initialize parameters corresponding to YUV-format */
-    setup_param();
-
     if (!open_input()) {
         return EXIT_FAILURE;
     }
 
-    if (!sdl_init()) {
-        return EXIT_FAILURE;
-    }
-
-    if (!allocate_memory()) {
-        ret = EXIT_FAILURE;
+    if (!reinit()) {
         goto cleanup;
     }
 
@@ -1324,10 +1356,7 @@ int main(int argc, char** argv)
 cleanup:
     destroy_message_queue();
     SDL_FreeYUVOverlay(my_overlay);
-    free(P.raw);
-    free(P.y_data);
-    free(P.cb_data);
-    free(P.cr_data);
+    check_free_memory();
     if (fd) {
         fclose(fd);
     }

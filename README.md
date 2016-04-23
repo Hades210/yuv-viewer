@@ -10,6 +10,7 @@ Supports the following formats:
 - YUY2
 - YV1210
 - Y42210
+- YUV420SP / NV12
 
 YV1210 is the same as YV12 with 10bpp.
 Since SDL does not support this format, I fake it
@@ -39,6 +40,8 @@ Features
 - Only display Luma data
 - Only display Cr data
 - Only display Cb data
+- Interactive change width or height param on the fly
+    for quickly when guess param of yuv file
 - Diff two files of the same size and format
 - PSNR calculation
 - Master/Slave mode that allows two instances of
@@ -83,22 +86,25 @@ Supported commands
 
     SPACE - Play clip
     RIGHT - Single step 1 frame forward
-    LEFT - Single step 1 frame backward
-    r - Rewind
-    UP - Zoom in
-    DOWN - Zoom out
-    g - Enable grid-mode
-    m - Enable MB-mode, point and click to
-        print MB-data to stdout
-    h - histogram, 1 per color plane
-    F5/y - Toggle viewing of Luma data only
-    F6/u - Toggle viewing of Cb data only
-    F7/v - Toggle viewing of Cr data only
-    F8/a - Display all color-planes
-    q - Quit
-    F1 - MASTER-mode
-    F2 - SLAVE-mode
-    F3 - NONE-mode, i.e. disable MASTER/SLAVE-mode
+    LEFT  - Single step 1 frame backward
+    UP    - Zoom in
+    DOWN  - Zoom out
+    F5/y  - Toggle viewing of Luma(Y) data only
+    F6/u  - Toggle viewing of Cb(U) data only
+    F7/v  - Toggle viewing of Cr(V) data only
+    F8/a  - Display all color-planes
+    j     - increase height (vim key-binding style)
+    k     - decrease height
+    h     - decrease width
+    l     - increase width
+    r     - Rewind
+    g     - Enable grid-mode
+    m     - Enable MB-mode, point and click to print MB-data to stdout
+    s     - histogram, 1 per color plane
+    q     - Quit
+    F1    - MASTER-mode
+    F2    - SLAVE-mode
+    F3    - NONE-mode, i.e. disable MASTER/SLAVE-mode
 
 Disclaimer
 ----------
