@@ -11,6 +11,9 @@ Supports the following formats:
 - YV1210
 - Y42210
 - YUV420SP / NV12
+- NV21
+- MONO / GREY / Y800 / Y8
+- YV16
 
 YV1210 is the same as YV12 with 10bpp.
 Since SDL does not support this format, I fake it

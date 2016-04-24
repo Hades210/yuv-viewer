@@ -45,6 +45,7 @@
 Uint32 rd(Uint8* data, Uint32 size);
 Uint32 read_planar(void);
 Uint32 read_planar_vu(void);
+Uint32 read_planar_vu_sample(void);
 Uint32 read_semi_planar(void);
 Uint32 read_semi_planar_vu(void);
 Uint32 read_mono(void);
@@ -137,7 +138,7 @@ FmtMap gFmtMap[] = {
     [NV12] = {SDL_YV12_OVERLAY, read_semi_planar, draw_yv12, "yuv420sp nv12"},
     [NV21] = {SDL_YV12_OVERLAY, read_semi_planar_vu, draw_yv12, "nv21"},
     [MONO] = {SDL_YV12_OVERLAY, read_mono, draw_yv12, "mono y8 grey"},
-    [YV16] = {SDL_YV12_OVERLAY, read_planar_vu, draw_yv12, "yv16"},
+    [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_sample, draw_yv12, "yv16"},
 };
 
 char *showFmt(Uint32 format) {
@@ -226,6 +227,21 @@ Uint32 read_planar_vu(void)
     if (!rd(P.y_data, P.y_size)) return 0;
     if (!rd(P.cr_data, P.cr_size)) return 0;
     if (!rd(P.cb_data, P.cb_size)) return 0;
+    return 1;
+}
+
+Uint32 read_planar_vu_sample(void)
+{
+    if (!read_planar_vu()) {
+        return 0;
+    }
+    // show it with YV12, 420 sample, so drop half of Cb, Cr data
+    for (Uint32 i = 1; i < P.height / 2; i++) {
+        memcpy(P.cr_data + i * P.width / 2, P.cr_data + i * P.width, P.width / 2);
+    }
+    for (Uint32 i = 1; i < P.height / 2; i++) {
+        memcpy(P.cb_data + i * P.width / 2, P.cb_data + i * P.width, P.width / 2);
+    }
     return 1;
 }
 
