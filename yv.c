@@ -51,6 +51,8 @@ Uint32 read_yv1210(void);
 Uint32 read_yuv420sp(void);
 Uint32 check_free_memory(void);
 Uint32 allocate_memory(void);
+void draw_grid422_param(int step, int dot, int color0, int color1);
+void draw_grid420_param(int step, int dot, int color0, int color1);
 void draw_grid422(void);
 void draw_grid420(void);
 void luma_only(void);
@@ -85,7 +87,18 @@ void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
+
 Uint32 guess_arg(char *filename);
+int strfmtcmp(const void *p0, const void *p1);
+int strfmtcmp_r(const void *p0, const void *p1);
+
+typedef struct StrFmt {
+    char *str;
+    int fmt;
+} StrFmt;
+StrFmt *buildStrFmtLst(Uint32 *pLen);
+void destoryStrFmtLst(void);
+Uint32 parse_format(char *fmtstr);
 
 /* Supported YUV-formats */
 enum {
@@ -97,6 +110,7 @@ enum {
     YV1210=5,    /* 10 bpp YV12 */
     Y42210=6,
     YUV420SP=7,
+    FORMAT_MAX,
 };
 
 typedef struct {
@@ -343,26 +357,48 @@ Uint32 allocate_memory(void)
     return 1;
 }
 
+void draw_grid422_param(int step, int dot, int color0, int color1) {
+    /* horizontal grid lines */
+    for (Uint32 y = 0; y < P.height; y += step) {
+        for (Uint32 x = P.grid_start_pos; x < P.width * 2; x += dot * 2) {
+            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = color0;
+            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x + 8) = color1;
+        }
+    }
+    /* vertical grid lines */
+    for (Uint32 x = P.grid_start_pos; x < P.width * 2; x += 2 * step) {
+        for (Uint32 y = 0; y < P.height; y += dot) {
+            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = color0;
+            *(my_overlay->pixels[0] + (y + 4) * my_overlay->pitches[0] + x) = color1;
+        }
+    }
+}
+void draw_grid420_param(int step, int dot, int color0, int color1) {
+    /* horizontal grid lines */
+    for (Uint32 y = 0; y < P.height; y += step) {
+        for (Uint32 x = 0; x < P.width; x += dot) {
+            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = color0;
+            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x + 4) = color1;
+        }
+    }
+    /* vertical grid lines */
+    for (Uint32 x = 0; x < P.width; x += step) {
+        for (Uint32 y = 0; y < P.height; y += dot) {
+            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = color0;
+            *(my_overlay->pixels[0] + (y + 4) * my_overlay->pitches[0] + x) = color1;
+        }
+    }
+
+}
 void draw_grid422(void)
 {
     if (!P.grid) {
         return;
     }
+    draw_grid422_param(16, 8, 0xF0, 0x20);
+    draw_grid422_param(64, 1, 0x90, 0x20);
+    draw_grid422_param(256, 1, 0xE0, 0x20);
 
-    /* horizontal grid lines */
-    for (Uint32 y = 0; y < P.height; y += 16) {
-        for (Uint32 x = P.grid_start_pos; x < P.width * 2; x += 16) {
-            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
-            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x + 8) = 0x20;
-        }
-    }
-    /* vertical grid lines */
-    for (Uint32 x = P.grid_start_pos; x < P.width * 2; x += 32) {
-        for (Uint32 y = 0; y < P.height; y += 8) {
-            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
-            *(my_overlay->pixels[0] + (y + 4) * my_overlay->pitches[0] + x) = 0x20;
-        }
-    }
 }
 
 void draw_grid420(void)
@@ -370,21 +406,9 @@ void draw_grid420(void)
     if (!P.grid) {
         return;
     }
-
-    /* horizontal grid lines */
-    for (Uint32 y = 0; y < P.height; y += 16) {
-        for (Uint32 x = 0; x < P.width; x += 8) {
-            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
-            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x + 4) = 0x20;
-        }
-    }
-    /* vertical grid lines */
-    for (Uint32 x = 0; x < P.width; x += 16) {
-        for (Uint32 y = 0; y < P.height; y += 8) {
-            *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
-            *(my_overlay->pixels[0] + (y + 4) * my_overlay->pitches[0] + x) = 0x20;
-        }
-    }
+    draw_grid420_param(16, 8, 0xF0, 0x20);
+    draw_grid420_param(64, 1, 0x90, 0x20);
+    draw_grid420_param(256, 1, 0xE0, 0x20);
 }
 
 void luma_only(void)
@@ -700,8 +724,6 @@ void setup_param(void)
         P.y_size = P.wh;
         P.cb_size = P.wh / 4;
         P.cr_size = P.wh / 4;
-        printf("format=%d bpp=%f frame_size=%d y_size=%d cb_size=%d cr_size=%d\n",
-               FORMAT, 1.5, P.frame_size, P.y_size, P.cb_size, P.cr_size);
     } else if (FORMAT == YUY2 || FORMAT == UYVY || FORMAT == YVYU || FORMAT == Y42210) {
         P.grid_start_pos = 0;
         P.frame_size = P.wh * 2;
@@ -737,6 +759,8 @@ void setup_param(void)
         P.cb_start_pos = 3;
         P.cr_start_pos = 1;
     }
+    printf("format=%d size=%dx%d frame_size=%d y_size=%d cb_size=%d cr_size=%d\n",
+           FORMAT, P.width, P.height, P.frame_size, P.y_size, P.cb_size, P.cr_size);
 }
 
 void check_input(void)
@@ -940,6 +964,7 @@ void set_zoom_rect(void)
     } else {
         DIE("ERROR in zoom:\n");
     }
+    // printf("zoom to %dx%d\n", P.zoom_width, P.zoom_height);
 }
 
 Uint32 redraw(void)
@@ -1175,11 +1200,6 @@ Uint32 event_loop(void)
     return quit;
 }
 
-typedef struct StrFmt {
-    char *str;
-    int fmt;
-} StrFmt;
-
 int strfmtcmp(const void *p0, const void *p1) {
     char *s0 = ((StrFmt *)p0)->str;
     char *s1 = ((StrFmt *)p1)->str;
@@ -1196,7 +1216,7 @@ int strfmtcmp_r(const void *p0, const void *p1) {
 }
 
 static char **gNameLst;
-StrFmt *buildStrFmtLst(int *pLen) {
+StrFmt *buildStrFmtLst(Uint32 *pLen) {
     Uint32 ft = 0, len = COUNT_OF(gFmtMap);
     gNameLst = malloc(sizeof(char *) * len);
     for (ft = 0; ft != len; ft++) {
@@ -1234,8 +1254,8 @@ void destoryStrFmtLst() {
     }
 }
 Uint32 parse_format(char *fmtstr) {
-    FORMAT = -1;
-    int tokidx;
+    FORMAT = FORMAT_MAX;
+    Uint32 tokidx;
     StrFmt *toklst = buildStrFmtLst(&tokidx);
     qsort(toklst, tokidx, sizeof(StrFmt), strfmtcmp_r);
     for (Uint32 i = 0; i != tokidx; i++) {
@@ -1248,7 +1268,7 @@ Uint32 parse_format(char *fmtstr) {
 
 cleanup:
     destoryStrFmtLst();
-    return FORMAT != -1;
+    return FORMAT != FORMAT_MAX;
 }
 Uint32 guess_arg(char *filename) {
     char *s = filename;
@@ -1268,7 +1288,7 @@ Uint32 guess_arg(char *filename) {
     }
     int height = strtol(s + i, &s, 10);
     parse_format(filename);
-    if (FORMAT == -1) {
+    if (FORMAT == FORMAT_MAX) {
         DIE("cannot find fmt\n");
         return 0;
     }
@@ -1294,7 +1314,7 @@ Uint32 parse_input(int argc, char **argv)
         P.height = atoi(argv[3]);
         char *fmt = argv[4];
         parse_format(fmt);
-        if (FORMAT == -1) {
+        if (FORMAT == FORMAT_MAX) {
             DIE("The format option '%s' is not recognized\n", fmt);
             return 0;
         }
