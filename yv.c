@@ -5,6 +5,7 @@
 #include <math.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <stdbool.h>
 
 #include "SDL.h"
 
@@ -45,7 +46,8 @@
 Uint32 rd(Uint8* data, Uint32 size);
 Uint32 read_planar(void);
 Uint32 read_planar_vu(void);
-Uint32 read_planar_vu_sample(void);
+Uint32 read_planar_vu_422sample(void);
+Uint32 read_planar_vu_444sample(void);
 Uint32 read_semi_planar(void);
 Uint32 read_semi_planar_vu(void);
 Uint32 read_mono(void);
@@ -58,6 +60,7 @@ void draw_grid422_param(int step, int dot, int color0, int color1);
 void draw_grid420_param(int step, int dot, int color0, int color1);
 void draw_grid422(void);
 void draw_grid420(void);
+bool isPlanar(Uint32 fmt);
 void luma_only(void);
 void cb_only(void);
 void cr_only(void);
@@ -117,6 +120,7 @@ enum {
     NV21 = 8,
     MONO = 9,
     YV16 = 10,
+    YUV444P = 11,
     FORMAT_MAX,
 };
 
@@ -127,9 +131,16 @@ typedef struct {
     char *fmtNameLst;
 } FmtMap;
 
+#if 0
+#define SDL_YV12_OVERLAY  0x32315659  /* Planar mode: Y + V + U */
+#define SDL_IYUV_OVERLAY  0x56555949  /* Planar mode: Y + U + V */
+#define SDL_YUY2_OVERLAY  0x32595559  /* Packed mode: Y0+U0+Y1+V0 */
+#define SDL_UYVY_OVERLAY  0x59565955  /* Packed mode: U0+Y0+V0+Y1 */
+#define SDL_YVYU_OVERLAY  0x55595659  /* Packed mode: Y0+V0+Y1+U0 */
+#endif
 FmtMap gFmtMap[] = {
     [YV12] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "yv12"},
-    [IYUV] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "iyuv"},
+    [IYUV] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "iyuv i420"},
     [YUY2] = {SDL_YUY2_OVERLAY, read_422, draw_422, "yuy2 yuyv"},
     [UYVY] = {SDL_UYVY_OVERLAY, read_422, draw_422, "uyvy"},
     [YVYU] = {SDL_YVYU_OVERLAY, read_422, draw_422, "yvyu"},
@@ -138,7 +149,8 @@ FmtMap gFmtMap[] = {
     [NV12] = {SDL_YV12_OVERLAY, read_semi_planar, draw_yv12, "yuv420sp nv12"},
     [NV21] = {SDL_YV12_OVERLAY, read_semi_planar_vu, draw_yv12, "nv21"},
     [MONO] = {SDL_YV12_OVERLAY, read_mono, draw_yv12, "mono y8 grey"},
-    [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_sample, draw_yv12, "yv16"},
+    [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_422sample, draw_yv12, "yv16 422p"},
+    [YUV444P] = {SDL_YV12_OVERLAY, read_planar_vu_444sample, draw_yv12, "444p"},
 };
 
 char *showFmt(Uint32 format) {
@@ -230,7 +242,7 @@ Uint32 read_planar_vu(void)
     return 1;
 }
 
-Uint32 read_planar_vu_sample(void)
+Uint32 read_planar_vu_422sample(void)
 {
     if (!read_planar_vu()) {
         return 0;
@@ -241,6 +253,24 @@ Uint32 read_planar_vu_sample(void)
     }
     for (Uint32 i = 1; i < P.height / 2; i++) {
         memcpy(P.cb_data + i * P.width / 2, P.cb_data + i * P.width, P.width / 2);
+    }
+    return 1;
+}
+
+Uint32 read_planar_vu_444sample(void)
+{
+    if (!read_planar_vu()) {
+        return 0;
+    }
+    for (Uint32 i = 0; i < P.height / 2; i++) {
+        for (Uint32 j = 0; j < P.width / 2; j++) {
+            P.cr_data[i * P.width / 2 + j] = P.cr_data[i * P.width + j * 2];
+        }
+    }
+    for (Uint32 i = 0; i < P.height / 2; i++) {
+        for (Uint32 j = 0; j < P.width / 2; j++) {
+            P.cb_data[i * P.width / 2 + j] = P.cb_data[i * P.width + j * 2];
+        }
     }
     return 1;
 }
@@ -472,13 +502,19 @@ void draw_grid420(void)
     draw_grid420_param(256, 1, 0xE0, 0x20);
 }
 
+bool isPlanar(Uint32 fmt) {
+    return fmt == YV12 || fmt == IYUV || fmt == YV1210
+        || fmt == NV12 || fmt == NV21 || fmt == MONO
+        || fmt == YV16 || fmt == YUV444P;
+}
+
 void luma_only(void)
 {
     if (!P.y_only) {
         return;
     }
 
-    if (FORMAT == NV12 || FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210 || FORMAT == MONO || FORMAT == YV16) {
+    if (isPlanar(FORMAT)) {
         /* Set croma part to 0x80 */
         for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
         for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
@@ -500,7 +536,7 @@ void cb_only(void)
         return;
     }
 
-    if (FORMAT == NV12 || FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210 || FORMAT == YV16) {
+    if (isPlanar(FORMAT)) {
         /* Set Luma part and Cr to 0x80 */
         for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
         for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
@@ -522,7 +558,7 @@ void cr_only(void)
         return;
     }
 
-    if (FORMAT == NV12 || FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210 || FORMAT == YV16) {
+    if (isPlanar(FORMAT)) {
         /* Set Luma part and Cb to 0x80 */
         for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
         for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
@@ -798,6 +834,9 @@ void setup_param(void)
             P.y_size = P.wh;
             P.cb_size = P.cr_size = P.wh / 2;
             P.grid_start_pos = 0;
+            break;
+        case YUV444P:
+            P.y_size = P.cb_size = P.cr_size = P.wh;
             break;
         default:
             DIE("unhandled format=%d(%s)\n", FORMAT, showFmt(FORMAT));
