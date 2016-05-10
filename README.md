@@ -3,14 +3,13 @@ Simple YCbCr-Viewer (YUV)
 
 Supports the following formats:
 
-- YV12
+- YV12; YV12 10bit
 - IYUV
 - YVYU
 - UYVY
 - YUY2
-- YV1210
 - Y42210
-- YUV420SP / NV12
+- YUV420SP / NV12; NV12 10bit
 - NV21
 - MONO / GREY / Y800 / Y8
 - YV16
@@ -113,3 +112,14 @@ Disclaimer
 ----------
 
 Only verified on a Linux based system...
+
+TODO List
+---------
+
+- [X] guess argument in filename
+- [X] yuv420sp
+- [ ] RGB/RGBA support
+- [X] 10bit
+- [ ] Tile mode
+- [ ] swap Cb/Cr
+- [X] increase stride

@@ -50,6 +50,7 @@ Uint32 read_planar_vu_422sample(void);
 Uint32 read_planar_vu_444sample(void);
 Uint32 read_semi_planar(void);
 Uint32 read_semi_planar_vu(void);
+Uint32 read_semi_planar_10(void);
 Uint32 read_mono(void);
 Uint32 read_422(void);
 Uint32 read_y42210(void);
@@ -93,6 +94,8 @@ void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
+Uint32 comb_byte(Uint8 a, Uint32 offset0, Uint8 b, Uint32 offset1);
+Uint32 ten2eight_compact(Uint8* src, Uint8* dst, Uint32 length);
 
 Uint32 guess_arg(char *filename);
 int strfmtcmp(const void *p0, const void *p1);
@@ -121,6 +124,7 @@ enum {
     MONO = 9,
     YV16 = 10,
     YUV444P = 11,
+    NV1210 = 12,
     FORMAT_MAX,
 };
 
@@ -151,6 +155,7 @@ FmtMap gFmtMap[] = {
     [MONO] = {SDL_YV12_OVERLAY, read_mono, draw_yv12, "mono y8 grey"},
     [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_422sample, draw_yv12, "yv16 422p"},
     [YUV444P] = {SDL_YV12_OVERLAY, read_planar_vu_444sample, draw_yv12, "444p"},
+    [NV1210] = {SDL_YV12_OVERLAY, read_semi_planar_10, draw_yv12, "nv1210"},
 };
 
 char *showFmt(Uint32 format) {
@@ -311,6 +316,40 @@ Uint32 read_semi_planar(void)
     return 1;
 }
 
+Uint32 read_semi_planar_10(void)
+{
+    Uint32 ret = 1;
+    Uint8 * data = malloc(sizeof(Uint8) * P.y_size * 1.5);
+    if (!data) {
+        DIE("Error allocating memory...\n");
+        return 0;
+    }
+    if (!rd(data, P.y_size * 10 / 8)) {
+        ret = 0;
+        goto cleanup;
+    }
+    ten2eight_compact(data, P.y_data, P.y_size);
+
+    if (!rd(data, (P.cb_size + P.cr_size) * 10 / 8)) {
+        ret = 0;
+        goto cleanup;
+    }
+    ten2eight_compact(data, P.raw, P.cb_size + P.cr_size);
+
+    Uint8 *cb = P.cb_data, *cr = P.cr_data;
+    for (Uint32 i = 0; i < P.cb_size; i++) {
+        *cb++ = P.raw[i * 2];
+    }
+    for (Uint32 i = 0; i < P.cr_size; i++) {
+        *cr++ = P.raw[i * 2 + 1];
+    }
+
+cleanup:
+    free(data);
+    return ret;
+}
+
+
 Uint32 read_422(void)
 {
     Uint8* y = P.y_data;
@@ -408,6 +447,39 @@ cleanyv1210:
     return ret;
 }
 
+// get 10bit from low bit to high bit
+// data sample: {0xf8, 0xe1, 0x87, 0x1f, 0x7e}
+// from low to high bit,
+// -> {0b00011111, 0b10000111, 0b11100001, 0b11111000, 0b01111110}
+// combine to 10bit
+// -> {0b0001111110, 0b0001111110, 0b0001111110, 0b0001111110}
+// round back to 8bit
+// -> {0b01111110, 0b01111110, 0b01111110, 0b01111110}
+// -> {0x7e, 0x7e, 0x7e, 0x7e}
+Uint32 comb_byte(Uint8 a, Uint32 offset0, Uint8 b, Uint32 offset1) {
+    Uint32 x = a >> (8 - offset0);
+    Uint32 y = (b & ((1 << offset1) - 1)) << offset0;
+    return (((x | y) & 0x3ff) + 0x2) >> 2;
+}
+
+// Compact ten2eight
+// Every 5 bytes representation four 10-bit data
+Uint32 ten2eight_compact(Uint8* src, Uint8* dst, Uint32 length)
+{
+    Uint8 *p0, *p1;
+    for (Uint32 i = 0, j = 0; j < length; i += 5, j += 4) {
+        p0 = src + i;
+        p1 = dst + j;
+        p1[0] = comb_byte(p0[0], 8, p0[1], 2);
+        p1[1] = comb_byte(p0[1], 6, p0[2], 4);
+        p1[2] = comb_byte(p0[2], 4, p0[3], 6);
+        p1[3] = comb_byte(p0[3], 2, p0[4], 8);
+    }
+    return 1;
+}
+
+// Loose ten2eight
+// every two bytes representation one 10-bit data
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length)
 {
     Uint16 x = 0;
@@ -489,7 +561,7 @@ void draw_grid422(void)
     draw_grid422_param(16, 8, 0xF0, 0x20);
     draw_grid422_param(64, 1, 0x90, 0x20);
     draw_grid422_param(256, 1, 0xE0, 0x20);
-
+    draw_grid422_param(1024, 1, 0x00, 0x20);
 }
 
 void draw_grid420(void)
@@ -500,12 +572,13 @@ void draw_grid420(void)
     draw_grid420_param(16, 8, 0xF0, 0x20);
     draw_grid420_param(64, 1, 0x90, 0x20);
     draw_grid420_param(256, 1, 0xE0, 0x20);
+    draw_grid420_param(1024, 1, 0x00, 0x20);
 }
 
 bool isPlanar(Uint32 fmt) {
     return fmt == YV12 || fmt == IYUV || fmt == YV1210
         || fmt == NV12 || fmt == NV21 || fmt == MONO
-        || fmt == YV16 || fmt == YUV444P;
+        || fmt == YV16 || fmt == YUV444P || fmt == NV1210;
 }
 
 void luma_only(void)
@@ -821,6 +894,7 @@ void setup_param(void)
         case IYUV:
         case YV1210:
         case NV12:
+        case NV1210:
         case NV21:
         case MONO:
             P.y_size = P.wh;

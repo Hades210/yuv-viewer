@@ -21,7 +21,7 @@ $(TARGET): $(OBJ)
 clean:
 	rm -rf $(OBJ) $(TARGET) core*
 
-install:
+install: yv
 	[ -d $(INSTALLDIR) ] || mkdir $(INSTALLDIR)
 	mv yv $(INSTALLDIR)
 
