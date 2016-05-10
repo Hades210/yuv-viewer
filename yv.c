@@ -95,6 +95,7 @@ void set_zoom_rect(void);
 void histogram(void);
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
 Uint32 comb_byte(Uint8 a, Uint32 offset0, Uint8 b, Uint32 offset1);
+Uint32 dither(Uint32 x);
 Uint32 ten2eight_compact(Uint8* src, Uint8* dst, Uint32 length);
 
 Uint32 guess_arg(char *filename);
@@ -458,8 +459,12 @@ cleanyv1210:
 // -> {0x7e, 0x7e, 0x7e, 0x7e}
 Uint32 comb_byte(Uint8 a, Uint32 offset0, Uint8 b, Uint32 offset1) {
     Uint32 x = a >> (8 - offset0);
-    Uint32 y = (b & ((1 << offset1) - 1)) << offset0;
-    return (((x | y) & 0x3ff) + 0x2) >> 2;
+    Uint32 y = b & ((1 << offset1) - 1);
+    return (x | (y << offset0)) & 0x3ff;
+}
+
+Uint32 dither(Uint32 x) {
+    return (x + 0x2) >> 2;
 }
 
 // Compact ten2eight
@@ -470,10 +475,10 @@ Uint32 ten2eight_compact(Uint8* src, Uint8* dst, Uint32 length)
     for (Uint32 i = 0, j = 0; j < length; i += 5, j += 4) {
         p0 = src + i;
         p1 = dst + j;
-        p1[0] = comb_byte(p0[0], 8, p0[1], 2);
-        p1[1] = comb_byte(p0[1], 6, p0[2], 4);
-        p1[2] = comb_byte(p0[2], 4, p0[3], 6);
-        p1[3] = comb_byte(p0[3], 2, p0[4], 8);
+        p1[0] = dither(comb_byte(p0[0], 8, p0[1], 2));
+        p1[1] = dither(comb_byte(p0[1], 6, p0[2], 4));
+        p1[2] = dither(comb_byte(p0[2], 4, p0[3], 6));
+        p1[3] = dither(comb_byte(p0[3], 2, p0[4], 8));
     }
     return 1;
 }
