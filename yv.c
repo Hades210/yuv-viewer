@@ -61,6 +61,7 @@ void draw_grid422_param(int step, int dot, int color0, int color1);
 void draw_grid420_param(int step, int dot, int color0, int color1);
 void draw_grid422(void);
 void draw_grid420(void);
+Uint32 bitdepth(Uint32 fmt);
 bool isPlanar(Uint32 fmt);
 void luma_only(void);
 void cb_only(void);
@@ -184,6 +185,7 @@ struct param {
     Uint32 height;            /* frame height - in pixels */
     Uint32 wh;                /* width x height */
     Uint32 frame_size;        /* size of 1 frame - in bytes */
+    Uint32 raw_frame_size;    /* original frame size - in bytes */
     Sint32 zoom;              /* zoom-factor */
     Uint32 zoom_width;
     Uint32 zoom_height;
@@ -580,6 +582,14 @@ void draw_grid420(void)
     draw_grid420_param(1024, 1, 0x00, 0x20);
 }
 
+Uint32  bitdepth(Uint32 fmt) {
+    if (fmt == NV1210 || fmt == YV1210) {
+        return 10;
+    } else {
+        return 8;
+    }
+}
+
 bool isPlanar(Uint32 fmt) {
     return fmt == YV12 || fmt == IYUV || fmt == YV1210
         || fmt == NV12 || fmt == NV21 || fmt == MONO
@@ -922,6 +932,7 @@ void setup_param(void)
             break;
     }
     P.frame_size = P.y_size + P.cb_size + P.cr_size;
+    P.raw_frame_size = P.frame_size * bitdepth(FORMAT) / 8;
 
     if (FORMAT == YUY2) {
         /* Y U Y V
@@ -1240,9 +1251,9 @@ Uint32 event_loop(void)
                     case SDLK_LEFT: /* previous frame */
                         if (frame > 1) {
                             frame--;
-                            fseek(fd, ((frame-1) * P.frame_size), SEEK_SET);
+                            fseek(fd, ((frame - 1) * P.raw_frame_size), SEEK_SET);
                             if (P.diff) {
-                                fseek(P.fd2, ((frame-1) * P.frame_size), SEEK_SET);
+                                fseek(P.fd2, ((frame - 1) * P.raw_frame_size), SEEK_SET);
                             }
                             read_frame();
                             draw_frame();
@@ -1273,6 +1284,7 @@ Uint32 event_loop(void)
                         break;
                     case SDLK_r: /* rewind */
                         if (frame > 1) {
+                            frame = 1;
                             redraw();
                         }
                         break;
