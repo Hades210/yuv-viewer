@@ -27,3 +27,10 @@ install: yv
 
 test: yv
 	./yv cif.yuv 352 288 nv12
+
+stat:
+	cloc .
+check:
+	cppcheck .
+style:
+	uncrustify *.c --replace --no-backup

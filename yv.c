@@ -18,10 +18,10 @@
 #define DIE(...)      fprintf(stderr, __VA_ARGS__)
 
 #define COUNT_OF(a) (sizeof(a) / sizeof(a[0]))
-#define precheck_range(index, array) \
+#define precheck_range(index, array)                 \
     if (index >= sizeof(array) / sizeof(array[0])) { \
-        DIE("index=%d out of range\n", index); \
-        exit(-1); \
+        DIE("index=%d out of range\n", index);       \
+        exit(-1);                                    \
     }
 
 
@@ -43,7 +43,7 @@
 #define ALL_PLANES 'j'
 
 /* PROTOTYPES */
-Uint32 rd(Uint8* data, Uint32 size);
+Uint32 rd(Uint8 *data, Uint32 size);
 Uint32 read_planar(void);
 Uint32 read_planar_vu(void);
 Uint32 read_planar_vu_422sample(void);
@@ -72,9 +72,9 @@ void draw_422(void);
 void draw_420sp(void);
 Uint32 redraw(void);
 Uint32 diff_mode(void);
-void calc_psnr(Uint8* frame0, Uint8* frame1);
-void usage(char* name);
-void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch);
+void calc_psnr(Uint8 *frame0, Uint8 *frame1);
+void usage(char *name);
+void mb_loop(char *str, Uint32 rows, Uint8 *data, Uint32 pitch);
 void show_mb(Uint32 mouse_x, Uint32 mouse_y);
 void draw_frame(void);
 Uint32 read_frame(void);
@@ -94,10 +94,10 @@ Uint32 reinit(void);
 void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
-Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
+Uint32 ten2eight(Uint8 *src, Uint8 *dst, Uint32 length);
 Uint32 comb_byte(Uint8 a, Uint32 offset0, Uint8 b, Uint32 offset1);
 Uint32 dither(Uint32 x);
-Uint32 ten2eight_compact(Uint8* src, Uint8* dst, Uint32 length);
+Uint32 ten2eight_compact(Uint8 *src, Uint8 *dst, Uint32 length);
 
 Uint32 guess_arg(char *filename);
 int strfmtcmp(const void *p0, const void *p1);
@@ -114,14 +114,14 @@ char *showFmt(Uint32 format);
 
 /* Supported YUV-formats */
 enum {
-    YV12=0,
-    IYUV=1,
-    YUY2=2,
-    UYVY=3,
-    YVYU=4,
-    YV1210=5,    /* 10 bpp YV12 */
-    Y42210=6,
-    NV12=7,
+    YV12 = 0,
+    IYUV = 1,
+    YUY2 = 2,
+    UYVY = 3,
+    YVYU = 4,
+    YV1210 = 5,    /* 10 bpp YV12 */
+    Y42210 = 6,
+    NV12 = 7,
     NV21 = 8,
     MONO = 9,
     YV16 = 10,
@@ -171,9 +171,9 @@ SDL_Surface *screen;
 SDL_Event event;
 SDL_Rect video_rect;
 SDL_Overlay *my_overlay;
-const SDL_VideoInfo* info = NULL;
+const SDL_VideoInfo *info = NULL;
 Uint32 FORMAT = YV12;
-FILE* fd;
+FILE *fd;
 
 struct my_msgbuf {
     long mtype;
@@ -203,12 +203,12 @@ struct param {
     Uint32 y_size;            /* sizeof luma-data for 1 frame - in bytes */
     Uint32 cb_size;           /* sizeof croma-data for 1 frame - in bytes */
     Uint32 cr_size;           /* sizeof croma-data for 1 frame - in bytes */
-    Uint8* raw;               /* pointer towards complete frame - frame_size bytes */
-    Uint8* y_data;            /* pointer towards luma-data */
-    Uint8* cb_data;           /* pointer towards croma-data */
-    Uint8* cr_data;           /* pointer towards croma-data */
-    char* filename;           /* obvious */
-    char* fname_diff;         /* see above */
+    Uint8 *raw;               /* pointer towards complete frame - frame_size bytes */
+    Uint8 *y_data;            /* pointer towards luma-data */
+    Uint8 *cb_data;           /* pointer towards croma-data */
+    Uint8 *cr_data;           /* pointer towards croma-data */
+    char *filename;           /* obvious */
+    char *fname_diff;         /* see above */
     Uint32 overlay_format;    /* YV12, IYUV, YUY2, UYVY or YVYU - SDL */
     Uint32 vflags;            /* HW support or SW support */
     Uint8 bpp;                /* bits per pixel */
@@ -216,13 +216,13 @@ struct param {
     struct my_msgbuf buf;
     int msqid;
     key_t key;
-    FILE* fd2;                /* diff file */
+    FILE *fd2;                /* diff file */
 };
 
 /* Global parameter struct */
 struct param P;
 
-Uint32 rd(Uint8* data, Uint32 size)
+Uint32 rd(Uint8 *data, Uint32 size)
 {
     Uint32 cnt;
 
@@ -236,17 +236,29 @@ Uint32 rd(Uint8* data, Uint32 size)
 
 Uint32 read_planar(void)
 {
-    if (!rd(P.y_data, P.y_size)) return 0;
-    if (!rd(P.cb_data, P.cb_size)) return 0;
-    if (!rd(P.cr_data, P.cr_size)) return 0;
+    if (!rd(P.y_data, P.y_size)) {
+        return 0;
+    }
+    if (!rd(P.cb_data, P.cb_size)) {
+        return 0;
+    }
+    if (!rd(P.cr_data, P.cr_size)) {
+        return 0;
+    }
     return 1;
 }
 
 Uint32 read_planar_vu(void)
 {
-    if (!rd(P.y_data, P.y_size)) return 0;
-    if (!rd(P.cr_data, P.cr_size)) return 0;
-    if (!rd(P.cb_data, P.cb_size)) return 0;
+    if (!rd(P.y_data, P.y_size)) {
+        return 0;
+    }
+    if (!rd(P.cr_data, P.cr_size)) {
+        return 0;
+    }
+    if (!rd(P.cb_data, P.cb_size)) {
+        return 0;
+    }
     return 1;
 }
 
@@ -284,7 +296,9 @@ Uint32 read_planar_vu_444sample(void)
 }
 
 Uint32 read_mono(void) {
-    if (!rd(P.y_data, P.y_size)) return 0;
+    if (!rd(P.y_data, P.y_size)) {
+        return 0;
+    }
     memset(P.cb_data, 0x80, P.cb_size);
     memset(P.cr_data, 0x80, P.cr_size);
     return 1;
@@ -292,9 +306,13 @@ Uint32 read_mono(void) {
 
 Uint32 read_semi_planar_vu(void)
 {
-    if (!rd(P.y_data, P.y_size)) return 0;
+    if (!rd(P.y_data, P.y_size)) {
+        return 0;
+    }
 
-    if (!rd(P.raw, P.cb_size + P.cr_size)) return 0;
+    if (!rd(P.raw, P.cb_size + P.cr_size)) {
+        return 0;
+    }
     Uint8 *cb = P.cb_data, *cr = P.cr_data;
     for (Uint32 i = 0; i < P.cb_size; i++) {
         *cb++ = P.raw[i * 2 + 1];
@@ -304,11 +322,16 @@ Uint32 read_semi_planar_vu(void)
     }
     return 1;
 }
+
 Uint32 read_semi_planar(void)
 {
-    if (!rd(P.y_data, P.y_size)) return 0;
+    if (!rd(P.y_data, P.y_size)) {
+        return 0;
+    }
 
-    if (!rd(P.raw, P.cb_size + P.cr_size)) return 0;
+    if (!rd(P.raw, P.cb_size + P.cr_size)) {
+        return 0;
+    }
     Uint8 *cb = P.cb_data, *cr = P.cr_data;
     for (Uint32 i = 0; i < P.cb_size; i++) {
         *cb++ = P.raw[i * 2];
@@ -322,7 +345,7 @@ Uint32 read_semi_planar(void)
 Uint32 read_semi_planar_10(void)
 {
     Uint32 ret = 1;
-    Uint8 * data = malloc(sizeof(Uint8) * P.y_size * 1.5);
+    Uint8 *data = malloc(sizeof(Uint8) * P.y_size * 1.5);
     if (!data) {
         DIE("Error allocating memory...\n");
         return 0;
@@ -352,26 +375,33 @@ cleanup:
     return ret;
 }
 
-
 Uint32 read_422(void)
 {
-    Uint8* y = P.y_data;
-    Uint8* cb = P.cb_data;
-    Uint8* cr = P.cr_data;
+    Uint8 *y = P.y_data;
+    Uint8 *cb = P.cb_data;
+    Uint8 *cr = P.cr_data;
 
-    if (!rd(P.raw, P.frame_size)) return 0;
+    if (!rd(P.raw, P.frame_size)) {
+        return 0;
+    }
 
-    for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) *y++ = P.raw[i];
-    for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) *cb++ = P.raw[i];
-    for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) *cr++ = P.raw[i];
+    for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) {
+        *y++ = P.raw[i];
+    }
+    for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) {
+        *cb++ = P.raw[i];
+    }
+    for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) {
+        *cr++ = P.raw[i];
+    }
     return 1;
 }
 
 Uint32 read_y42210(void)
 {
     Uint32 ret = 1;
-    Uint8* data;
-    Uint8* tmp;
+    Uint8 *data;
+    Uint8 *tmp;
 
     data = malloc(sizeof(Uint8) * P.frame_size * 2);
     if (!data) {
@@ -398,13 +428,13 @@ Uint32 read_y42210(void)
         j++;
     }
     /* Cb */
-    for (Uint32 i = P.cb_start_pos, j = 0 ; i < P.frame_size; i += 4) {
+    for (Uint32 i = P.cb_start_pos, j = 0; i < P.frame_size; i += 4) {
         P.raw[i] = tmp[P.wh + j];
         j++;
     }
     /* Cr */
     for (Uint32 i = P.cr_start_pos, j = 0; i < P.frame_size; i += 4) {
-        P.raw[i] = tmp[P.wh/2*3 + j];
+        P.raw[i] = tmp[P.wh / 2 * 3 + j];
         j++;
     }
 
@@ -418,7 +448,7 @@ cleany42210:
 Uint32 read_yv1210(void)
 {
     Uint32 ret = 1;
-    Uint8* data;
+    Uint8 *data;
 
     data = malloc(sizeof(Uint8) * P.y_size * 2);
     if (!data) {
@@ -471,7 +501,7 @@ Uint32 dither(Uint32 x) {
 
 // Compact ten2eight
 // Every 5 bytes representation four 10-bit data
-Uint32 ten2eight_compact(Uint8* src, Uint8* dst, Uint32 length)
+Uint32 ten2eight_compact(Uint8 *src, Uint8 *dst, Uint32 length)
 {
     Uint8 *p0, *p1;
     for (Uint32 i = 0, j = 0; j < length; i += 5, j += 4) {
@@ -487,12 +517,12 @@ Uint32 ten2eight_compact(Uint8* src, Uint8* dst, Uint32 length)
 
 // Loose ten2eight
 // every two bytes representation one 10-bit data
-Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length)
+Uint32 ten2eight(Uint8 *src, Uint8 *dst, Uint32 length)
 {
     Uint16 x = 0;
 
     for (Uint32 i = 0; i < length; i += 2) {
-        x = (src[i+1] << 8) | src[i];
+        x = (src[i + 1] << 8) | src[i];
         x = (x + 2) >> 2;
         if (x > 255) {
             x = 255;
@@ -504,10 +534,18 @@ Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length)
 }
 
 Uint32 check_free_memory(void) {
-    if (P.raw != NULL) { free(P.raw); }
-    if (P.y_data != NULL) {free(P.y_data); }
-    if (P.cb_data != NULL) { free(P.cb_data); }
-    if (P.cr_data != NULL) { free(P.cr_data); }
+    if (P.raw != NULL) {
+        free(P.raw);
+    }
+    if (P.y_data != NULL) {
+        free(P.y_data);
+    }
+    if (P.cb_data != NULL) {
+        free(P.cb_data);
+    }
+    if (P.cr_data != NULL) {
+        free(P.cr_data);
+    }
     return 1;
 }
 
@@ -543,6 +581,7 @@ void draw_grid422_param(int step, int dot, int color0, int color1) {
         }
     }
 }
+
 void draw_grid420_param(int step, int dot, int color0, int color1) {
     /* horizontal grid lines */
     for (Uint32 y = 0; y < P.height; y += step) {
@@ -560,6 +599,7 @@ void draw_grid420_param(int step, int dot, int color0, int color1) {
     }
 
 }
+
 void draw_grid422(void)
 {
     if (!P.grid) {
@@ -592,8 +632,8 @@ Uint32  bitdepth(Uint32 fmt) {
 
 bool isPlanar(Uint32 fmt) {
     return fmt == YV12 || fmt == IYUV || fmt == YV1210
-        || fmt == NV12 || fmt == NV21 || fmt == MONO
-        || fmt == YV16 || fmt == YUV444P || fmt == NV1210;
+           || fmt == NV12 || fmt == NV21 || fmt == MONO
+           || fmt == YV16 || fmt == YUV444P || fmt == NV1210;
 }
 
 void luma_only(void)
@@ -604,8 +644,12 @@ void luma_only(void)
 
     if (isPlanar(FORMAT)) {
         /* Set croma part to 0x80 */
-        for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
-        for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
+        for (Uint32 i = 0; i < P.cr_size; i++) {
+            my_overlay->pixels[1][i] = 0x80;
+        }
+        for (Uint32 i = 0; i < P.cb_size; i++) {
+            my_overlay->pixels[2][i] = 0x80;
+        }
         return;
     }
 
@@ -626,8 +670,12 @@ void cb_only(void)
 
     if (isPlanar(FORMAT)) {
         /* Set Luma part and Cr to 0x80 */
-        for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
-        for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
+        for (Uint32 i = 0; i < P.y_size; i++) {
+            my_overlay->pixels[0][i] = 0x80;
+        }
+        for (Uint32 i = 0; i < P.cr_size; i++) {
+            my_overlay->pixels[1][i] = 0x80;
+        }
         return;
     }
 
@@ -648,8 +696,12 @@ void cr_only(void)
 
     if (isPlanar(FORMAT)) {
         /* Set Luma part and Cb to 0x80 */
-        for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
-        for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
+        for (Uint32 i = 0; i < P.y_size; i++) {
+            my_overlay->pixels[0][i] = 0x80;
+        }
+        for (Uint32 i = 0; i < P.cb_size; i++) {
+            my_overlay->pixels[2][i] = 0x80;
+        }
         return;
     }
 
@@ -693,7 +745,7 @@ void draw_422(void)
     post_draw();
 }
 
-void usage(char* name)
+void usage(char *name)
 {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%s filename [width height format [diff_filename]]\n", name);
@@ -712,12 +764,12 @@ void usage(char* name)
     fprintf(stderr, "]\n");
 }
 
-void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch)
+void mb_loop(char *str, Uint32 rows, Uint8 *data, Uint32 pitch)
 {
     printf("%s\n", str);
-    for (Uint32 i = 0; i < rows;i++) {
+    for (Uint32 i = 0; i < rows; i++) {
         for (Uint32 j = 0; j < 16; j++) {
-            printf("%02X ", data[pitch+i]);
+            printf("%02X ", data[pitch + i]);
         }
         printf("\n");
     }
@@ -738,8 +790,8 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
 
     /* which MB are we in? */
     MB = mouse_x / (16 * P.zoom) +
-        (P.width / 16) *
-        (mouse_y / (16 * P.zoom));
+         (P.width / 16) *
+         (mouse_y / (16 * P.zoom));
 
     y_pitch = 16 * MB;
     cb_pitch = pitch[FORMAT] * MB;
@@ -780,8 +832,8 @@ Uint32 read_frame(void)
 
 Uint32 diff_mode(void)
 {
-    FILE* fd_tmp;
-    Uint8* y_tmp;
+    FILE *fd_tmp;
+    Uint8 *y_tmp;
 
     /* Perhaps a bit ugly but it seams to work...
      * 1. read frame from fd
@@ -834,16 +886,24 @@ Uint32 diff_mode(void)
         for (Uint32 i = 0; i < P.y_size; i++) {
             P.y_data[i] = 0x80 - (y_tmp[i] - P.y_data[i]);
         }
-        for (Uint32 i = 0; i < P.cb_size; i++) P.cb_data[i] = 0x80;
-        for (Uint32 i = 0; i < P.cr_size; i++) P.cr_data[i] = 0x80;
+        for (Uint32 i = 0; i < P.cb_size; i++) {
+            P.cb_data[i] = 0x80;
+        }
+        for (Uint32 i = 0; i < P.cr_size; i++) {
+            P.cr_data[i] = 0x80;
+        }
     } else {
         Uint32 j = 0;
         for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) {
             P.raw[i] = 0x80 - (y_tmp[j] - P.y_data[j]);
             j++;
         }
-        for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
-        for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
+        for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) {
+            P.raw[i] = 0x80;
+        }
+        for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) {
+            P.raw[i] = 0x80;
+        }
     }
 
     free(y_tmp);
@@ -851,7 +911,7 @@ Uint32 diff_mode(void)
     return 1;
 }
 
-void calc_psnr(Uint8* frame0, Uint8* frame1)
+void calc_psnr(Uint8 *frame0, Uint8 *frame1)
 {
     double mse = 0.0;
     double mse_tmp = 0.0;
@@ -870,7 +930,7 @@ void calc_psnr(Uint8* frame0, Uint8* frame1)
 
     mse /= P.y_size;
 
-    psnr = 10.0*log10((256 * 256) / mse);
+    psnr = 10.0 * log10((256 * 256) / mse);
 
     fprintf(stdout, "PSNR: %f\n", psnr);
 }
@@ -885,16 +945,28 @@ void histogram(void)
     Uint8 b[256] = {0};
     Uint8 r[256] = {0};
 
-    for (Uint32 i = 0; i < P.y_size; i++) y[P.y_data[i]]++;
-    for (Uint32 i = 0; i < P.cb_size; i++) b[P.cb_data[i]]++;
-    for (Uint32 i = 0; i < P.cr_size; i++) r[P.cr_data[i]]++;
+    for (Uint32 i = 0; i < P.y_size; i++) {
+        y[P.y_data[i]]++;
+    }
+    for (Uint32 i = 0; i < P.cb_size; i++) {
+        b[P.cb_data[i]]++;
+    }
+    for (Uint32 i = 0; i < P.cr_size; i++) {
+        r[P.cr_data[i]]++;
+    }
 
     fprintf(stdout, "\nY,");
-    for (Uint32 i = 0; i < 256; i++)  fprintf(stdout, "%u,", y[i]);
+    for (Uint32 i = 0; i < 256; i++) {
+        fprintf(stdout, "%u,", y[i]);
+    }
     fprintf(stdout, "\nCb,");
-    for (Uint32 i = 0; i < 256; i++)  fprintf(stdout, "%u,", b[i]);
+    for (Uint32 i = 0; i < 256; i++) {
+        fprintf(stdout, "%u,", b[i]);
+    }
     fprintf(stdout, "\nCr,");
-    for (Uint32 i = 0; i < 256; i++)  fprintf(stdout, "%u,", r[i]);
+    for (Uint32 i = 0; i < 256; i++) {
+        fprintf(stdout, "%u,", r[i]);
+    }
     fprintf(stdout, "\n");
     fflush(stdout);
 }
@@ -947,7 +1019,7 @@ void setup_param(void)
         P.grid_start_pos = 1;
         P.cb_start_pos = 0;
         P.cr_start_pos = 2;
-    } else if (FORMAT == YVYU || FORMAT == Y42210)  {
+    } else if (FORMAT == YVYU || FORMAT == Y42210) {
         /* Y V Y U
          * 0 1 2 3 */
         P.y_start_pos = 0;
@@ -1060,8 +1132,7 @@ Uint32 event_dispatcher(void)
 {
     if (read_message()) {
 
-        switch (P.buf.mtext[0])
-        {
+        switch (P.buf.mtext[0]) {
             case NEXT:
                 event.type = SDL_KEYDOWN;
                 event.key.keysym.sym = SDLK_RIGHT;
@@ -1133,19 +1204,19 @@ Uint32 event_dispatcher(void)
 void set_caption(char *array, Uint32 frame, Uint32 bytes)
 {
     snprintf(array, bytes, "%s - %s%s%s%s%s%s%s%s frame %d, size %dx%d",
-            P.filename,
-            (P.mode == MASTER) ? "[MASTER]" :
-            (P.mode == SLAVE) ? "[SLAVE]": "",
-            P.grid ? "G" : "",
-            P.mb ? "M" : "",
-            P.diff ? "D" : "",
-            P.hist ? "H" : "",
-            P.y_only ? "Y" : "",
-            P.cb_only ? "Cb" : "",
-            P.cr_only ? "Cr" : "",
-            frame,
-            P.zoom_width,
-            P.zoom_height);
+             P.filename,
+             (P.mode == MASTER) ? "[MASTER]" :
+             (P.mode == SLAVE) ? "[SLAVE]" : "",
+             P.grid ? "G" : "",
+             P.mb ? "M" : "",
+             P.diff ? "D" : "",
+             P.hist ? "H" : "",
+             P.y_only ? "Y" : "",
+             P.cb_only ? "Cb" : "",
+             P.cr_only ? "Cr" : "",
+             frame,
+             P.zoom_width,
+             P.zoom_height);
 }
 
 void set_zoom_rect(void)
@@ -1178,8 +1249,12 @@ Uint32 reinit(void)
 {
     /* Initialize parameters corresponding to YUV-format */
     setup_param();
-    if (!sdl_init()) { return 0; }
-    if (!allocate_memory()) { return 0; }
+    if (!sdl_init()) {
+        return 0;
+    }
+    if (!allocate_memory()) {
+        return 0;
+    }
     return 1;
 }
 
@@ -1208,24 +1283,23 @@ Uint32 event_loop(void)
             }
         }
 
-        switch (event.type)
-        {
+        switch (event.type) {
             case SDL_KEYDOWN:
-                switch (event.key.keysym.sym)
-                {
+                switch (event.key.keysym.sym) {
                     case SDLK_SPACE:
                         play_yuv = 1; /* play it, sam! */
                         while (play_yuv) {
                             start_ticks = SDL_GetTicks();
                             set_caption(caption, frame, 256);
-                            SDL_WM_SetCaption( caption, NULL );
+                            SDL_WM_SetCaption(caption, NULL);
 
                             /* check for next frame existing */
                             if (read_frame()) {
                                 draw_frame();
                                 /* insert delay for real time viewing */
-                                if (SDL_GetTicks() - start_ticks < 40)
+                                if (SDL_GetTicks() - start_ticks < 40) {
                                     SDL_Delay(40 - (SDL_GetTicks() - start_ticks));
+                                }
                                 frame++;
                                 send_message(NEXT);
                             } else {
@@ -1302,14 +1376,16 @@ Uint32 event_loop(void)
                         frame = 1; reinit(); redraw(); break;
                     case SDLK_g: /* display grid */
                         P.grid = ~P.grid;
-                        if (P.zoom < 1)
+                        if (P.zoom < 1) {
                             P.grid = 0;
+                        }
                         draw_frame();
                         break;
                     case SDLK_m: /* show mb-data on stdout */
                         P.mb = ~P.mb;
-                        if (P.zoom < 1)
+                        if (P.zoom < 1) {
                             P.mb = 0;
+                        }
                         draw_frame();
                         break;
                     case SDLK_F5: /* Luma data only */
@@ -1449,6 +1525,7 @@ void destoryStrFmtLst() {
         free(gNameLst[ft]);
     }
 }
+
 Uint32 parse_format(char *fmtstr) {
     FORMAT = FORMAT_MAX;
     Uint32 tokidx;
@@ -1466,6 +1543,7 @@ cleanup:
     destoryStrFmtLst();
     return FORMAT != FORMAT_MAX;
 }
+
 Uint32 guess_arg(char *filename) {
     char *s = filename;
     int i;
@@ -1564,7 +1642,7 @@ Uint32 sdl_init(void)
 
     P.bpp = info->vfmt->BitsPerPixel;
 
-    if (info->hw_available){
+    if (info->hw_available) {
         P.vflags = SDL_HWSURFACE;
     } else {
         P.vflags = SDL_SWSURFACE;
@@ -1584,7 +1662,7 @@ Uint32 sdl_init(void)
     return 1;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     int ret = EXIT_SUCCESS;
 
