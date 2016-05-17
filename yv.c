@@ -480,16 +480,16 @@ cleanyv1210:
     return ret;
 }
 
-// get 10bit from low bit to high bit
-// data sample: {0xf8, 0xe1, 0x87, 0x1f, 0x7e}
-// from low to high bit,
-// -> {0b00011111, 0b10000111, 0b11100001, 0b11111000, 0b01111110}
-// combine to 10bit
-// -> {0b0001111110, 0b0001111110, 0b0001111110, 0b0001111110}
-// round back to 8bit
-// -> {0b01111110, 0b01111110, 0b01111110, 0b01111110}
-// -> {0x7e, 0x7e, 0x7e, 0x7e}
 Uint32 comb_byte(Uint8 a, Uint32 offset0, Uint8 b, Uint32 offset1) {
+    // get 10bit from low bit to high bit
+    // data sample: {0xf8, 0xe1, 0x87, 0x1f, 0x7e}
+    // from low to high bit,
+    // -> {0b00011111, 0b10000111, 0b11100001, 0b11111000, 0b01111110}
+    // combine to 10bit
+    // -> {0b0001111110, 0b0001111110, 0b0001111110, 0b0001111110}
+    // round back to 8bit
+    // -> {0b01111110, 0b01111110, 0b01111110, 0b01111110}
+    // -> {0x7e, 0x7e, 0x7e, 0x7e}
     Uint32 x = a >> (8 - offset0);
     Uint32 y = b & ((1 << offset1) - 1);
     return (x | (y << offset0)) & 0x3ff;
@@ -808,6 +808,7 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
 
 void draw_frame(void)
 {
+    // lock pixels before modifying them
     SDL_LockYUVOverlay(my_overlay);
     precheck_range(FORMAT, gFmtMap);
     (gFmtMap[FORMAT].drawer)();
@@ -817,6 +818,7 @@ void draw_frame(void)
     video_rect.w = P.zoom_width;
     video_rect.h = P.zoom_height;
     SDL_UnlockYUVOverlay(my_overlay);
+
     SDL_DisplayYUVOverlay(my_overlay, &video_rect);
 }
 
@@ -1489,9 +1491,13 @@ int strfmtcmp_r(const void *p0, const void *p1) {
 
 static char **gNameLst;
 StrFmt *buildStrFmtLst(Uint32 *pLen) {
+    // fmtnameLst is a list with whitespace delimiter
+    // so split it to list.
+    // and build one dict which map from format name to format
     Uint32 ft = 0, len = COUNT_OF(gFmtMap);
     gNameLst = malloc(sizeof(char *) * len);
     for (ft = 0; ft != len; ft++) {
+        // dup it for writeable string
         gNameLst[ft] = strdup(showFmt(ft));
     }
 
@@ -1530,6 +1536,7 @@ Uint32 parse_format(char *fmtstr) {
     FORMAT = FORMAT_MAX;
     Uint32 tokidx;
     StrFmt *toklst = buildStrFmtLst(&tokidx);
+    // sort it for longest match
     qsort(toklst, tokidx, sizeof(StrFmt), strfmtcmp_r);
     for (Uint32 i = 0; i != tokidx; i++) {
         StrFmt *p = toklst + i;
@@ -1544,28 +1551,42 @@ cleanup:
     return FORMAT != FORMAT_MAX;
 }
 
-Uint32 guess_arg(char *filename) {
-    char *s = filename;
+Uint32 negCondSkip(char *s, int (*cond)(int));
+Uint32 negCondSkip(char *s, int (*cond)(int)) {
     int i;
-    for (i = 0; s[i] != '\0' && !isdigit(s[i]); i++) {
+    for (i = 0; s[i] != '\0' && !cond(s[i]); i++) {
     }
-    if (s[i] == '\0') {
+    return i;
+}
+
+Uint32 guess_arg(char *filename) {
+    /* how to guess
+     * - first number for width
+     * - second number for height
+     * - longest match format string in whole filename
+     */
+    char *s = filename;
+    char *p = s;
+    p += negCondSkip(p, isdigit);
+    if (*p == '\0') {
         DIE("cannot find width\n");
         return 0;
     }
-    int width = strtol(s + i, &s, 10);
-    for (i = 0; s[i] != '\0' && !isdigit(s[i]); i++) {
-    }
-    if (s[i] == '\0') {
+    int width = strtol(p, &p, 10);
+
+    p += negCondSkip(p, isdigit);
+    if (*p == '\0') {
         DIE("cannot find height\n");
         return 0;
     }
-    int height = strtol(s + i, &s, 10);
+    int height = strtol(p, &p, 10);
+
     parse_format(filename);
     if (FORMAT == FORMAT_MAX) {
         DIE("cannot find fmt\n");
         return 0;
     }
+
     P.width = width;
     P.height = height;
     LOG("guess width=%d height=%d fmt=%d(%s)\n",
