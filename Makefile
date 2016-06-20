@@ -1,4 +1,4 @@
-DBG        = #-ggdb3
+DBG        = -ggdb3
 OPTFLAGS   = -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes $(DBG) -pedantic
 SDL_LIBS   := $(shell sdl-config --static-libs)
 SDL_CFLAGS := $(shell sdl-config --cflags)

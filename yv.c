@@ -49,6 +49,7 @@ Uint32 read_planar_vu(void);
 Uint32 read_planar_vu_422sample(void);
 Uint32 read_planar_vu_444sample(void);
 Uint32 read_semi_planar(void);
+Uint32 read_semi_planar_tiled4x4(void);
 Uint32 read_semi_planar_vu(void);
 Uint32 read_semi_planar_10(void);
 Uint32 read_mono(void);
@@ -127,6 +128,7 @@ enum {
     YV16 = 10,
     YUV444P = 11,
     NV1210 = 12,
+    NV12TILED = 13,
     FORMAT_MAX,
 };
 
@@ -145,7 +147,7 @@ typedef struct {
 #define SDL_YVYU_OVERLAY  0x55595659  /* Packed mode: Y0+V0+Y1+U0 */
 #endif
 FmtMap gFmtMap[] = {
-    [YV12] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "yv12"},
+    [YV12] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "yv12 p420"},
     [IYUV] = {SDL_YV12_OVERLAY, read_planar, draw_yv12, "iyuv i420"},
     [YUY2] = {SDL_YUY2_OVERLAY, read_422, draw_422, "yuy2 yuyv"},
     [UYVY] = {SDL_UYVY_OVERLAY, read_422, draw_422, "uyvy"},
@@ -158,6 +160,7 @@ FmtMap gFmtMap[] = {
     [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_422sample, draw_yv12, "yv16 422p"},
     [YUV444P] = {SDL_YV12_OVERLAY, read_planar_vu_444sample, draw_yv12, "444p"},
     [NV1210] = {SDL_YV12_OVERLAY, read_semi_planar_10, draw_yv12, "nv1210"},
+    [NV12TILED] = {SDL_YV12_OVERLAY, read_semi_planar_tiled4x4, draw_yv12, "yuv420sp_tiled"},
 };
 
 char *showFmt(Uint32 format) {
@@ -370,6 +373,40 @@ Uint32 read_semi_planar_10(void)
         *cr++ = P.raw[i * 2 + 1];
     }
 
+cleanup:
+    free(data);
+    return ret;
+}
+
+#define TILED_WIDTH 4
+#define TILED_HEIGHT 4
+Uint32 read_semi_planar_tiled4x4(void)
+{
+    Uint8 *data = malloc(sizeof(Uint8) * P.frame_size);
+    Uint32 ret = 0;
+    if (!rd(data, P.frame_size)) {
+        goto cleanup;
+    }
+    Uint32 i, j, o, q;
+    for (i = 0; i != P.height; i++) {
+        for (j = 0; j != P.width; j++) {
+            o = i / TILED_HEIGHT * TILED_HEIGHT * P.width;
+            o += j / TILED_WIDTH * TILED_WIDTH * TILED_HEIGHT;
+            o += i % TILED_HEIGHT * TILED_HEIGHT;
+            o += j % TILED_WIDTH;
+            q = i * P.width + j;
+            P.y_data[q] = data[o];
+
+            o = i / 2 / TILED_HEIGHT * TILED_HEIGHT * P.width;
+            o += j / TILED_WIDTH * TILED_WIDTH * TILED_HEIGHT;
+            o += i / 2 % TILED_HEIGHT * TILED_HEIGHT;
+            o += j % TILED_WIDTH;
+            q = i / 2 * P.width / 2 + j / 2;
+            P.cb_data[q] = data[o + P.y_size];
+            P.cr_data[q] = data[o + P.y_size + 1];
+        }
+    }
+    ret = 1;
 cleanup:
     free(data);
     return ret;
@@ -633,7 +670,8 @@ Uint32  bitdepth(Uint32 fmt) {
 bool isPlanar(Uint32 fmt) {
     return fmt == YV12 || fmt == IYUV || fmt == YV1210
            || fmt == NV12 || fmt == NV21 || fmt == MONO
-           || fmt == YV16 || fmt == YUV444P || fmt == NV1210;
+           || fmt == YV16 || fmt == YUV444P || fmt == NV1210
+           || fmt == NV12TILED;
 }
 
 void luma_only(void)
@@ -985,6 +1023,7 @@ void setup_param(void)
         case NV12:
         case NV1210:
         case NV21:
+        case NV12TILED:
         case MONO:
             P.y_size = P.wh;
             P.cb_size = P.cr_size = P.wh / 4;
