@@ -131,6 +131,23 @@ Disclaimer
 
 Only verified on a Linux based system...
 
+### How to use it at Windows
+As it only support linux, so actually, for now, *CANNOT* support at Windows.
+However, we could run linux remote GUI program by X11 forwarding. This depend
+on other tools.
+
+* SSH client which support X11 forwarding, such as, SercureCRT, putty, XShell and so on.
+* X server at Windows, such as, [Xming](https://sourceforge.net/projects/xming/).
+
+- lunch Xming at background.
+- ssh to server by SecureCRT.
+- directoy run `yv [fileanme]` at server.
+- window pop out at local Windows PC.
+
+Notice, this GUI program run at linux remote server, by forwarding to local PC
+by SSH. So it's *SLOW*. Viewing 2K yuv at LAN environment, it works.
+Viewing 4K yuv at LAN, it lags.
+
 TODO List
 ---------
 
