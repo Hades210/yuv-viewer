@@ -62,10 +62,10 @@ Features
 Build
 -----
 
-## Dependency
+### Dependency
 - [libsdl](http://www.libsdl.org/) 1.x version
 
-### Ubuntu:
+#### Ubuntu:
 
     apt-get install libsdl1.2-dev
 
@@ -139,6 +139,7 @@ on other tools.
 * SSH client which support X11 forwarding, such as, SercureCRT, putty, XShell and so on.
 * X server at Windows, such as, [Xming](https://sourceforge.net/projects/xming/).
 
+ Steps::
 - lunch Xming at background.
 - ssh to server by SecureCRT.
 - directoy run `yv [fileanme]` at server.
@@ -156,5 +157,5 @@ TODO List
 - [ ] RGB/RGBA support
 - [X] 10bit
 - [X] Tile mode
-- [ ] swap Cb/Cr
+- [X] swap Cb/Cr
 - [X] increase stride

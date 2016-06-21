@@ -67,6 +67,7 @@ bool isPlanar(Uint32 fmt);
 void luma_only(void);
 void cb_only(void);
 void cr_only(void);
+void pre_draw(void);
 void post_draw(void);
 void draw_yv12(void);
 void draw_422(void);
@@ -220,6 +221,8 @@ struct param {
     int msqid;
     key_t key;
     FILE *fd2;                /* diff file */
+    bool is_change_uv;        /* exchange uv status for every frame */
+    bool flip_change_uv;      /* exchange uv flag this frame */
 };
 
 /* Global parameter struct */
@@ -402,8 +405,8 @@ Uint32 read_semi_planar_tiled4x4(void)
             o += i / 2 % TILED_HEIGHT * TILED_HEIGHT;
             o += j % TILED_WIDTH;
             q = i / 2 * P.width / 2 + j / 2;
-            P.cb_data[q] = data[o + P.y_size];
-            P.cr_data[q] = data[o + P.y_size + 1];
+            P.cr_data[q] = data[o + P.y_size];
+            P.cb_data[q] = data[o + P.y_size + 1];
         }
     }
     ret = 1;
@@ -752,6 +755,19 @@ void cr_only(void)
     }
 }
 
+#define SWAP(a, b, T)      { T t = a; a = b; b = t; }
+void pre_draw(void) {
+    if (P.flip_change_uv) {
+        P.flip_change_uv = false;
+        P.is_change_uv = !P.is_change_uv;
+        // exchange UV planar for this frame
+        SWAP(P.cr_data, P.cb_data, unsigned char *);
+    } else if (P.is_change_uv) {
+        // keep exchange UV for next frames
+        SWAP(P.cr_data, P.cb_data, unsigned char *);
+    }
+}
+
 void post_draw(void) {
     luma_only();
     cb_only();
@@ -760,6 +776,7 @@ void post_draw(void) {
 }
 
 void draw_420sp(void) {
+    pre_draw();
     memcpy(my_overlay->pixels[0], P.y_data, P.y_size);
     memcpy(my_overlay->pixels[1], P.cb_data, P.cb_size);
     memcpy(my_overlay->pixels[2], P.cr_data, P.cr_size);
@@ -769,6 +786,7 @@ void draw_420sp(void) {
 
 void draw_yv12(void)
 {
+    pre_draw();
     memcpy(my_overlay->pixels[0], P.y_data, P.y_size);
     memcpy(my_overlay->pixels[1], P.cr_data, P.cr_size);
     memcpy(my_overlay->pixels[2], P.cb_data, P.cb_size);
@@ -778,6 +796,7 @@ void draw_yv12(void)
 
 void draw_422(void)
 {
+    pre_draw();
     memcpy(my_overlay->pixels[0], P.raw, P.frame_size);
     draw_grid422();
     post_draw();
@@ -1420,6 +1439,10 @@ Uint32 event_loop(void)
                         if (P.zoom < 1) {
                             P.grid = 0;
                         }
+                        draw_frame();
+                        break;
+                    case SDLK_x:
+                        P.flip_change_uv = true;
                         draw_frame();
                         break;
                     case SDLK_m: /* show mb-data on stdout */
