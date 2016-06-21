@@ -3,18 +3,20 @@ Simple YCbCr-Viewer (YUV)
 
 Supports the following formats:
 
-- YV12; YV12 10bit
-- IYUV
-- YVYU
+- YV12 / P420
+- IYUV / I420
+- YUY2 / YUYV
 - UYVY
-- YUY2
-- Y42210
-- YUV420SP / NV12; NV12 10bit
-- YUV420SP Tiled mode
-    - 4x4
+- YVYU
+- YV12 10bit
+- Y422 10bit
+- YUV420SP / NV12
 - NV21
 - MONO / GREY / Y800 / Y8
-- YV16
+- YV12 / 422P
+- NV12 10bit
+- YUV420SP Tiled mode
+    - 4x4
 
 YV1210 is the same as YV12 with 10bpp.
 Since SDL does not support this format, I fake it
@@ -38,12 +40,12 @@ Features
 - Single Step Backwards
 - Zoom In by a factor of 1..n
 - Zoom Out by a factor of 1..n
-- Display a 16x16 grid on top of a frame
-- Dump Macro-Block-data to stdout for MB pointed
-  to by mouse
+- Display a 16x16, 64x64, 256x256, 1024x1024 multiple-level grid on top of a frame
+- Dump Macro-Block-data to stdout for MB pointed to by mouse
 - Only display Luma data
 - Only display Cr data
 - Only display Cb data
+- Exchange Cr/Cb data
 - Interactive change width or height param on the fly
     for quickly when guess param of yuv file
 - Diff two files of the same size and format
@@ -112,16 +114,17 @@ Supported commands
     F5/y  - Toggle viewing of Luma(Y) data only
     F6/u  - Toggle viewing of Cb(U) data only
     F7/v  - Toggle viewing of Cr(V) data only
-    F8/a  - Display all color-planes
+    F8/a  - Display (A)ll color-planes
     j     - increase height (vim key-binding style)
     k     - decrease height
     h     - decrease width
     l     - increase width
-    r     - Rewind
-    g     - Enable grid-mode
-    m     - Enable MB-mode, point and click to print MB-data to stdout
-    s     - histogram, 1 per color plane
-    q     - Quit
+    r     - (R)ewind
+    x     - E(X)change UV planar
+    g     - Enable (G)rid-mode
+    m     - Enable (M)B-mode, point and click to print MB-data to stdout
+    s     - hi(S)togram, 1 per color plane
+    q     - (Q)uit
     F1    - MASTER-mode
     F2    - SLAVE-mode
     F3    - NONE-mode, i.e. disable MASTER/SLAVE-mode
