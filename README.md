@@ -10,6 +10,8 @@ Supports the following formats:
 - YUY2
 - Y42210
 - YUV420SP / NV12; NV12 10bit
+- YUV420SP Tiled mode
+    - 4x4
 - NV21
 - MONO / GREY / Y800 / Y8
 - YV16
@@ -57,11 +59,27 @@ Features
 - Histogram for the different color planes, per frame
   as csv-data to stdout (for now at least)
 
+Build
+-----
+
+## Dependency
+- [libsdl](http://www.libsdl.org/) 1.x version
+
+### Ubuntu:
+
+    apt-get install libsdl1.2-dev
+
+## Build
+
+    make
+    make install
+
 Usage
 -----
 
-    ./yv filename width height format
+    ./yv [FILENAME] [WIDTH] [HEIGHT] [FORMAT]
     ./yv foreman_cif.yuv 352 288 YV12
+    ./yv foreman_352x288_yv12.yuv # smart guess from filename
 
 To use MASTER/SLAVE, type the following
 command in two different shells or send them to
@@ -120,6 +138,6 @@ TODO List
 - [X] yuv420sp
 - [ ] RGB/RGBA support
 - [X] 10bit
-- [ ] Tile mode
+- [X] Tile mode
 - [ ] swap Cb/Cr
 - [X] increase stride
