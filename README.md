@@ -3,6 +3,8 @@ Simple YCbCr-Viewer (YUV)
 
 Supports the following formats:
 
+![classify](https://raw.githubusercontent.com/liuyang1/yuv-viewer/master/classify.png)
+
 - YV12 / P420
 - IYUV / I420
 - YUY2 / YUYV
@@ -13,7 +15,7 @@ Supports the following formats:
 - YUV420SP / NV12
 - NV21
 - MONO / GREY / Y800 / Y8
-- YV12 / 422P
+- YV16 / 422P
 - NV12 10bit
 - YUV420SP Tiled mode
     - 4x4
@@ -142,10 +144,10 @@ on other tools.
 * SSH client which support X11 forwarding, such as, SercureCRT, putty, XShell and so on.
 * X server at Windows, such as, [Xming](https://sourceforge.net/projects/xming/).
 
- Steps::
+### Steps
 - lunch Xming at background.
 - ssh to server by SecureCRT.
-- directoy run `yv [fileanme]` at server.
+- directoy run `yv [filename]` at server.
 - window pop out at local Windows PC.
 
 Notice, this GUI program run at linux remote server, by forwarding to local PC
@@ -162,3 +164,4 @@ TODO List
 - [X] Tile mode
 - [X] swap Cb/Cr
 - [X] increase stride
+- [ ] 444p format
