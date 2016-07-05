@@ -976,6 +976,7 @@ void calc_psnr(Uint8 *frame0, Uint8 *frame1)
     double mse_tmp = 0.0;
     double psnr = 0.0;
 
+    // only compare Y component
     for (Uint32 i = 0; i < P.y_size; i++) {
         mse_tmp = abs(frame0[i] - frame1[i]);
         mse += mse_tmp * mse_tmp;
@@ -983,7 +984,7 @@ void calc_psnr(Uint8 *frame0, Uint8 *frame1)
 
     /* division by zero */
     if (mse == 0) {
-        fprintf(stdout, "PSNR: NaN\n");
+        fprintf(stdout, "PSNR: NaN MSE=0\n");
         return;
     }
 
@@ -1665,6 +1666,7 @@ Uint32 parse_input(int argc, char **argv)
             /* diff mode */
             P.diff = 1;
             P.fname_diff = argv[5];
+            printf("diff mode: with fn=[%s]\n", P.fname_diff);
         }
 
         P.filename = argv[1];
