@@ -76,7 +76,8 @@ Uint32 redraw(void);
 Uint32 diff_mode(void);
 void calc_psnr(Uint8 *frame0, Uint8 *frame1);
 void usage(char *name);
-void mb_loop(char *str, Uint32 rows, Uint8 *data, Uint32 pitch);
+void mb_loop(char *str, Uint8 *start_addr, Uint32 cols, Uint32 rows,
+             Uint32 stride, Uint32 delim);
 void show_mb(Uint32 mouse_x, Uint32 mouse_y);
 void draw_frame(void);
 Uint32 read_frame(void);
@@ -821,46 +822,83 @@ void usage(char *name)
     fprintf(stderr, "]\n");
 }
 
-void mb_loop(char *str, Uint32 rows, Uint8 *data, Uint32 pitch)
+// show block size cols, rows, stride,
+// add delim width to show YUYV alike case.
+void mb_loop(char *str, Uint8 *start_addr, Uint32 cols, Uint32 rows,
+             Uint32 stride, Uint32 delim)
 {
     printf("%s\n", str);
     for (Uint32 i = 0; i < rows; i++) {
-        for (Uint32 j = 0; j < 16; j++) {
-            printf("%02X ", data[pitch + i]);
+        for (Uint32 j = 0; j < cols; j++) {
+            printf("%02X ", start_addr[i * stride + j * (1 + delim)]);
+            if ((j + 1) % 4 == 0) {
+                printf(" ");
+            }
         }
         printf("\n");
+        if ((i + 1) % 4 == 0) {
+            printf("\n");
+        }
     }
 }
 
 void show_mb(Uint32 mouse_x, Uint32 mouse_y)
 {
-    /* TODO: bad code */
-    Uint32 MB;
-    Uint32 pitch[5] = {64, 64, 128, 128, 128};
-    Uint32 length[5] = {4, 4, 8, 8, 8};
-
-    Uint16 y_pitch, cb_pitch, cr_pitch;
-
     if (!P.mb) {
         return;
     }
+    if (bitdepth(FORMAT) == 10) {
+        printf("10-bitdepth raw data dither to 8bit\n");
+    }
+    if (P.width % 16 != 0) {
+        printf("support non-align width=%d have issue\n", P.width);
+        goto unsupport;
+    }
+    Uint32 MB;
 
     /* which MB are we in? */
-    MB = mouse_x / (16 * P.zoom) +
-         (P.width / 16) *
-         (mouse_y / (16 * P.zoom));
+    int mb_x = mouse_x / (16 * P.zoom);
+    int mb_y = mouse_y / (16 * P.zoom);
+    MB = mb_x + (P.width / 16) * mb_y;
 
-    y_pitch = 16 * MB;
-    cb_pitch = pitch[FORMAT] * MB;
-    cr_pitch = pitch[FORMAT] * MB;
-    printf("\nMB #%d\n", MB);
+    printf("\nMB (%d, %d) #%d\n", mb_x, mb_y, MB);
 
-    mb_loop("= Y =", 16, P.y_data, y_pitch);
-    mb_loop("= Cb =", length[FORMAT], P.cb_data, cb_pitch);
-    mb_loop("= Cr =", length[FORMAT], P.cr_data, cr_pitch);
+    void (*drawer)(void) = gFmtMap[FORMAT].drawer;
+    if (drawer == draw_422) {
+        Uint8 *p = P.raw + 32 * MB;
+        switch (gFmtMap[FORMAT].overlay_fmt) {
+            case SDL_YUY2_OVERLAY:
+                /* Packed mode: Y0+U0+Y1+V0 */
+                mb_loop("= Y =", p, 16, 16, P.width, 1);
+                mb_loop("= Cb =", p + 1, 8, 16, P.width, 3);
+                mb_loop("= Cr =", p + 3, 8, 16, P.width, 3);
+                break;
+            case SDL_UYVY_OVERLAY:
+                mb_loop("= Y =", p + 1, 16, 16, P.width, 1);
+                mb_loop("= Cb =", p, 8, 16, P.width, 3);
+                mb_loop("= Cr =", p + 2, 8, 16, P.width, 3);
+                break;
+            case SDL_YVYU_OVERLAY:
+                mb_loop("= Y =", p, 16, 16, P.width, 1);
+                mb_loop("= Cb =", p + 3, 8, 16, P.width, 3);
+                mb_loop("= Cr =", p + 1, 8, 16, P.width, 3);
+                break;
+            default:
+                goto unsupport;
+        }
+    } else if (drawer == draw_yv12) {
+        mb_loop("= Y =", P.y_data + 16 * MB, 16, 16, P.width, 0);
+        mb_loop("= Cb =", P.cb_data + 8 * MB, 8, 8, P.width / 2, 0);
+        mb_loop("= Cr =", P.cr_data + 8 * MB, 8, 8, P.width / 2, 0);
+    } else {
+        goto unsupport;
+    }
 
-    printf("\n");
     fflush(stdout);
+    return;
+unsupport:
+    printf("unsupport show_mb for format=%d[%s]\n",
+           FORMAT, gFmtMap[FORMAT].fmtNameLst);
 }
 
 void draw_frame(void)

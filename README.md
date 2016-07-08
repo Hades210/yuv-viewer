@@ -84,7 +84,8 @@ Usage
 
 #### smart guess
 
-    ./yv foreman_352x288_yv12.yuv # smart guess from filename
+    # smart guess from filename
+    ./yv foreman_352x288_yv12.yuv
 
 #### MASTER/SLAVE mode
 
@@ -107,7 +108,7 @@ and format, just add file as the last argument
 (computes and displays differences in luma value only,
 PSNR value is written to stdout):
 
-    ./yv filename width height format diff_file
+    ./yv [FILENAME] [WIDTH] [HEIGHT] [FORMAT] [DIFF_FILE]
     ./yv foreman_cif.yuv 352 288 YV12 foreman_filtered_cif.yuv
 
 Supported commands
