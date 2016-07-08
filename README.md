@@ -1,5 +1,9 @@
-Simple YCbCr-Viewer (YUV)
-=========================
+yvu-viewer
+==========
+
+Simple yuv-viewer with many features
+
+[![Build Status](https://travis-ci.org/liuyang1/yuv-viewer.svg?branch=master)](https://travis-ci.org/liuyang1/yuv-viewer)
 
 [YUV](http://www.fourcc.org/yuv.php) have so many format.
 

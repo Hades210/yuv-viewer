@@ -1586,6 +1586,7 @@ StrFmt *buildStrFmtLst(Uint32 *pLen) {
     return toklst;
 cleanup:
     *pLen = 0;
+    free(toklst);
     return NULL;
 }
 
