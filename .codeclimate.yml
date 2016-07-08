@@ -1,0 +1,8 @@
+engines:
+    fixme:
+        enabled: true
+        exclude_fingerprints:
+            - 89fd33f6be9a1fc093b12c8416f72305
+ratings:
+    path: []
+exclude_paths: []
