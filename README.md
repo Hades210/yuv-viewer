@@ -4,6 +4,7 @@ yvu-viewer
 Simple yuv-viewer with many features
 
 [![Build Status](https://travis-ci.org/liuyang1/yuv-viewer.svg?branch=master)](https://travis-ci.org/liuyang1/yuv-viewer)
+[![Tag Status](https://img.shields.io/github/tag/liuyang1/yuv-viewer.svg)]
 
 [YUV](http://www.fourcc.org/yuv.php) have so many format.
 
@@ -176,3 +177,4 @@ TODO List
     Not support linux, it's too inconvenient. As libsdl support Windows, I plan
     to support it too.
 - [ ] show difference of yuv under diff mode
+- [X] Tiled 10bit

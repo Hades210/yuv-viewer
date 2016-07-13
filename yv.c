@@ -49,7 +49,9 @@ Uint32 read_planar_vu(void);
 Uint32 read_planar_vu_422sample(void);
 Uint32 read_planar_vu_444sample(void);
 Uint32 read_semi_planar(void);
+void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height);
 Uint32 read_semi_planar_tiled4x4(void);
+Uint32 read_semi_planar_10_tiled4x4(void);
 Uint32 read_semi_planar_vu(void);
 Uint32 read_semi_planar_10(void);
 Uint32 read_mono(void);
@@ -131,6 +133,7 @@ enum {
     YUV444P = 11,
     NV1210 = 12,
     NV12TILED = 13,
+    NV1210TILED = 14,
     FORMAT_MAX,
 };
 
@@ -163,6 +166,7 @@ FmtMap gFmtMap[] = {
     [YUV444P] = {SDL_YV12_OVERLAY, read_planar_vu_444sample, draw_yv12, "444p"},
     [NV1210] = {SDL_YV12_OVERLAY, read_semi_planar_10, draw_yv12, "nv1210"},
     [NV12TILED] = {SDL_YV12_OVERLAY, read_semi_planar_tiled4x4, draw_yv12, "yuv420sp_tiled"},
+    [NV1210TILED] = {SDL_YV12_OVERLAY, read_semi_planar_10_tiled4x4, draw_yv12, "yuv420sp_tiled_mode0_10bit"},
 };
 
 char *showFmt(Uint32 format) {
@@ -382,8 +386,28 @@ cleanup:
     return ret;
 }
 
-#define TILED_WIDTH 4
-#define TILED_HEIGHT 4
+void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height) {
+    Uint32 i, j, o, q;
+    for (i = 0; i != P.height; i++) {
+        for (j = 0; j != P.width; j++) {
+            o = i / tiled_height * tiled_height * P.width;
+            o += j / tiled_width * tiled_width * tiled_height;
+            o += i % tiled_height * tiled_height;
+            o += j % tiled_width;
+            q = i * P.width + j;
+            P.y_data[q] = data[o];
+
+            o = i / 2 / tiled_height * tiled_height * P.width;
+            o += j / tiled_width * tiled_width * tiled_height;
+            o += i / 2 % tiled_height * tiled_height;
+            o += j % tiled_width;
+            q = i / 2 * P.width / 2 + j / 2;
+            P.cr_data[q] = data[o + P.y_size];
+            P.cb_data[q] = data[o + P.y_size + 1];
+        }
+    }
+}
+
 Uint32 read_semi_planar_tiled4x4(void)
 {
     Uint8 *data = malloc(sizeof(Uint8) * P.frame_size);
@@ -391,25 +415,34 @@ Uint32 read_semi_planar_tiled4x4(void)
     if (!rd(data, P.frame_size)) {
         goto cleanup;
     }
-    Uint32 i, j, o, q;
-    for (i = 0; i != P.height; i++) {
-        for (j = 0; j != P.width; j++) {
-            o = i / TILED_HEIGHT * TILED_HEIGHT * P.width;
-            o += j / TILED_WIDTH * TILED_WIDTH * TILED_HEIGHT;
-            o += i % TILED_HEIGHT * TILED_HEIGHT;
-            o += j % TILED_WIDTH;
-            q = i * P.width + j;
-            P.y_data[q] = data[o];
+    de_semi_planar_tile(data, 4, 4);
+    ret = 1;
+cleanup:
+    free(data);
+    return ret;
+}
 
-            o = i / 2 / TILED_HEIGHT * TILED_HEIGHT * P.width;
-            o += j / TILED_WIDTH * TILED_WIDTH * TILED_HEIGHT;
-            o += i / 2 % TILED_HEIGHT * TILED_HEIGHT;
-            o += j % TILED_WIDTH;
-            q = i / 2 * P.width / 2 + j / 2;
-            P.cr_data[q] = data[o + P.y_size];
-            P.cb_data[q] = data[o + P.y_size + 1];
-        }
+Uint32 read_semi_planar_10_tiled4x4(void)
+{
+    Uint32 ret = 1;
+    Uint8 *data = malloc(sizeof(Uint8) * P.y_size * 1.5);
+    if (!data) {
+        DIE("Error allocating memory...\n");
+        return 0;
     }
+    if (!rd(data, P.y_size * 10 / 8)) {
+        ret = 0;
+        goto cleanup;
+    }
+    ten2eight_compact(data, P.raw, P.y_size);
+    if (!rd(data, (P.cb_size + P.cr_size) * 10 / 8)) {
+        ret = 0;
+        goto cleanup;
+    }
+    ten2eight_compact(data, P.raw + P.y_size, P.cb_size + P.cr_size);
+
+    // now P.raw is semi_planar_tiled4x4 format
+    de_semi_planar_tile(P.raw, 4, 4);
     ret = 1;
 cleanup:
     free(data);
@@ -673,9 +706,9 @@ Uint32  bitdepth(Uint32 fmt) {
 
 bool isPlanar(Uint32 fmt) {
     return fmt == YV12 || fmt == IYUV || fmt == YV1210
-           || fmt == NV12 || fmt == NV21 || fmt == MONO
-           || fmt == YV16 || fmt == YUV444P || fmt == NV1210
-           || fmt == NV12TILED;
+        || fmt == NV12 || fmt == NV21 || fmt == MONO
+        || fmt == YV16 || fmt == YUV444P || fmt == NV1210
+        || fmt == NV12TILED || fmt == NV1210TILED;
 }
 
 void luma_only(void)
@@ -1082,6 +1115,7 @@ void setup_param(void)
         case NV1210:
         case NV21:
         case NV12TILED:
+        case NV1210TILED:
         case MONO:
             P.y_size = P.wh;
             P.cb_size = P.cr_size = P.wh / 4;
@@ -1770,6 +1804,12 @@ Uint32 sdl_init(void)
         P.vflags = SDL_HWSURFACE;
     } else {
         P.vflags = SDL_SWSURFACE;
+    }
+
+    // find SDL_SetVideoMode crash when 32768x320 size
+    if (P.width > 4096 || P.height > 2160) {
+        DIE("SDL cannot support size=%dx%d > 4096x2160\n", P.width, P.height);
+        return 0;
     }
 
     if ((screen = SDL_SetVideoMode(P.width, P.height, P.bpp, P.vflags)) == 0) {

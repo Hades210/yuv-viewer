@@ -1,6 +1,8 @@
 # Change Log
 
 ## [Unreleased]
+- show_mb support
+- 10bit tiled format
 
 ## [v0.2] - 2016-07-07
 ### Added
