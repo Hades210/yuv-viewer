@@ -4,13 +4,22 @@ yvu-viewer
 Simple yuv-viewer with many features
 
 [![Build Status](https://travis-ci.org/liuyang1/yuv-viewer.svg?branch=master)](https://travis-ci.org/liuyang1/yuv-viewer)
-[![Tag Status](https://img.shields.io/github/tag/liuyang1/yuv-viewer.svg)]
+![Tag Status](https://img.shields.io/github/tag/liuyang1/yuv-viewer.svg)
 
 [YUV](http://www.fourcc.org/yuv.php) have so many format.
 
 Supports the following formats:
 
-![classify](https://raw.githubusercontent.com/liuyang1/yuv-viewer/master/classify.png)
+![classify](img/classify.png)
+
+| dim         | range                       |
+|-------------|-----------------------------|
+| color space | YUV, RGB, Grey              |
+| sample      | 444, 422, 420               |
+| planar      | packed, semi-planar, planar |
+| order       | YUV, YVU, ..                |
+| bitdepth    | 8bit, 10bit, ..             |
+| scan type   | raster, tiled               |
 
 - YV12 / P420
 - IYUV / I420
