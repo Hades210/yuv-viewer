@@ -610,15 +610,19 @@ Uint32 ten2eight(Uint8 *src, Uint8 *dst, Uint32 length)
 Uint32 check_free_memory(void) {
     if (P.raw != NULL) {
         free(P.raw);
+        P.raw = NULL;
     }
     if (P.y_data != NULL) {
         free(P.y_data);
+        P.y_data = NULL;
     }
     if (P.cb_data != NULL) {
         free(P.cb_data);
+        P.cb_data = NULL;
     }
     if (P.cr_data != NULL) {
         free(P.cr_data);
+        P.cr_data = NULL;
     }
     return 1;
 }
