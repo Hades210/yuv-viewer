@@ -1,9 +1,19 @@
 DBG        = -ggdb3
 OPTFLAGS   = -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes $(DBG) -pedantic
-SDL_LIBS   := $(shell sdl-config --static-libs)
-SDL_CFLAGS := $(shell sdl-config --cflags)
+SDLVERSION = 1.2
+ifeq ($(SDLVERSION),1.2)
+SDLCONFIG = sdl-config
+else ifeq ($(SDLVERSION),2)
+SDLCONFIG = sdl2-config
+$(info config to $(SDLCONFIG))
+endif
+SDL_LIBS   := $(shell $(SDLCONFIG) --static-libs)
+SDL_CFLAGS := $(shell $(SDLCONFIG) --cflags)
 CFLAGS     = $(OPTFLAGS)  $(SDL_CFLAGS) -std=c99
 LDFLAGS    = $(SDL_LIBS) -lm #-lefence
+
+$(info CFLAGS $(CFLAGS))
+$(info LDFLAGS $(LDFLAGS))
 
 SRC        = yv.c
 TARGET     = yv

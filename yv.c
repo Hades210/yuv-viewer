@@ -1811,7 +1811,7 @@ Uint32 sdl_init(void)
     }
 
     // find SDL_SetVideoMode crash when 32768x320 size
-    if (P.width > 4096 || P.height > 2160) {
+    if (P.width > 4096 || P.height > 2176) {
         DIE("SDL cannot support size=%dx%d > 4096x2160\n", P.width, P.height);
         return 0;
     }
