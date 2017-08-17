@@ -49,6 +49,9 @@ Features
 - Smart guess option from filename
 - **Interactive change width or height param on the fly**
     for quickly when guess param of yuv file
+
+> If you need guess YUV frame's width or height, you may need this feature.
+
 - Play, Pause, Rewind
 - Single Step Forward, Backwards
 - Zoom In/Out by a factor of 1..n
@@ -147,15 +150,56 @@ Supported commands
     F2    - SLAVE-mode
     F3    - NONE-mode, i.e. disable MASTER/SLAVE-mode
 
+
+How to use guess width or height of YUV'frame?
+----------------------------------------------
+
+As you know, YUV frame is raw data, so don't have width, height or format information in raw data.
+
+1. guess format. check the raw data with hex viewer tool, for example: hexedit in Linux platfrom.
+
+```
+    hexedit [yuv-data]
+```
+
+```
+63 62 60 61  62 62 63 63 ...
+```
+
+the data is continuous, no sudden change in initial sequence data. so it isn't UYVY format. It's planar or semi-planar format.
+
+2. guess the width
+
+```
+    yv [yuv-data] 1280 720 nv12
+```
+
+![grayscale](img/grayscale.png)
+
+- check Y planar only with `y` key.
+- It's duplicate two shadow picture. So we could guess the actual width is (k + 0.5) times of 1280, such as 640, 1920, ..
+- one quick solution is tuning width on the fly with `h` or `l` key.
+- quick swtich its width to 640 or 1920. We will find the good result with 1920 width.
+
+![wrong height](img/colorful.png)
+
+- then enable U,V planar back with `y` key.
+- tuning height on the fly with `j` or `k` key.
+
+![correct result](img/correct.png)
+
+Finally, we get 1920 * 1088, NV12 frame.
+
+
 Disclaimer
 ----------
 
 Only verified on a Linux based system...
 
 ### How to use it at Windows
-It only support run linux natively now.
+It only support run Linux natively now.
 
-However, we could run linux remote GUI program by X11 forwarding. This depend
+However, we could run Linux remote GUI program by X11 forwarding. This depend
 on other tools.
 
 * SSH client which support X11 forwarding, such as, SercureCRT, putty, XShell and so on.
@@ -167,7 +211,7 @@ on other tools.
 - directoy run `yv [filename]` at server.
 - window pop out at local Windows PC.
 
-Notice, this GUI program run at linux remote server, by forwarding to local PC
+Notice, this GUI program run at Linux remote server, by forwarding to local PC
 by SSH. So it's **SLOW**. Viewing 2K yuv at LAN environment, it works.
 Viewing 4K yuv at LAN, it lags.
 
@@ -183,7 +227,7 @@ TODO List
 - [ ] RGB/RGBA support
 - [ ] 444p format
 - [ ] Windows support
-    Not support linux, it's too inconvenient. As libsdl support Windows, I plan
+    Not support Windows, it's too inconvenient. As libsdl support Windows, I plan
     to support it too.
 - [ ] show difference of yuv under diff mode
 - [X] Tiled 10bit
