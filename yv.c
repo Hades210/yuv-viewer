@@ -50,7 +50,8 @@ Uint32 read_planar_vu_422sample(void);
 Uint32 read_planar_vu_444sample(void);
 Uint32 read_semi_planar(void);
 void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height);
-Uint32 read_semi_planar_tiled4x4(void);
+void de_semi_planar_transpose_tile(Uint8 *data, int tiled_width, int tiled_height);
+Uint32 read_semi_planar_tiled8x4(void);
 Uint32 read_semi_planar_10_tiled4x4(void);
 Uint32 read_semi_planar_vu(void);
 Uint32 read_semi_planar_10(void);
@@ -103,6 +104,7 @@ Uint32 ten2eight(Uint8 *src, Uint8 *dst, Uint32 length);
 Uint32 comb_byte(Uint8 a, Uint32 offset0, Uint8 b, Uint32 offset1);
 Uint32 dither(Uint32 x);
 Uint32 ten2eight_compact(Uint8 *src, Uint8 *dst, Uint32 length);
+Uint32 ten2eight_tiled(Uint8 *src, Uint8 *dst, Uint32 length);
 
 Uint32 guess_arg(char *filename);
 int strfmtcmp(const void *p0, const void *p1);
@@ -165,8 +167,8 @@ FmtMap gFmtMap[] = {
     [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_422sample, draw_yv12, "yv16 422p"},
     [YUV444P] = {SDL_YV12_OVERLAY, read_planar_vu_444sample, draw_yv12, "444p"},
     [NV1210] = {SDL_YV12_OVERLAY, read_semi_planar_10, draw_yv12, "nv1210"},
-    [NV12TILED] = {SDL_YV12_OVERLAY, read_semi_planar_tiled4x4, draw_yv12, "yuv420sp_tiled"},
-    [NV1210TILED] = {SDL_YV12_OVERLAY, read_semi_planar_10_tiled4x4, draw_yv12, "yuv420sp_tiled_mode0_10bit"},
+    [NV12TILED] = {SDL_YV12_OVERLAY, read_semi_planar_tiled8x4, draw_yv12, "yuv420sp_tiled"},
+    [NV1210TILED] = {SDL_YV12_OVERLAY, read_semi_planar_10_tiled4x4, draw_yv12, "yuv420sp_tiled_mode0_10bit nv1210_tiled"},
 };
 
 char *showFmt(Uint32 format) {
@@ -386,6 +388,7 @@ cleanup:
     return ret;
 }
 
+// write frame from DATA
 void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height) {
     Uint32 i, j, o, q;
     for (i = 0; i != P.height; i++) {
@@ -408,14 +411,36 @@ void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height) {
     }
 }
 
-Uint32 read_semi_planar_tiled4x4(void)
+void transpose_tile(Uint8 *data, int tiled_width, int tiled_height) {
+    Uint32 i, j;
+    Uint32 winsize = tiled_width * tiled_height;
+    Uint32 winnum = P.width * P.height / winsize;
+    Uint8 *t = malloc(sizeof(Uint8) * winsize);
+    for (i = 0; i != winnum; i++) {
+        for (j = 0; j != winsize; j++) {
+            int p = j / tiled_height;
+            int q = tiled_height - 1 - j % tiled_height;
+            t[q * tiled_width + p] = data[winsize * i + j];
+        }
+        memcpy(data + winsize * i, t, winsize);
+    }
+    free(t);
+}
+
+Uint32 read_semi_planar_tiled8x4(void)
 {
     Uint8 *data = malloc(sizeof(Uint8) * P.frame_size);
     Uint32 ret = 0;
     if (!rd(data, P.frame_size)) {
         goto cleanup;
     }
-    de_semi_planar_tile(data, 4, 4);
+    printf("read frame size=%d\n", P.frame_size);
+    de_semi_planar_tile(data, 8, 4);
+  //   rd(data,  P.cb_size + P.cr_size);
+// printf("skip %d\n", P.cb_size + P.cr_size);
+    const int extra = 2176 * 240;
+    rd(data, extra);
+    printf("skip %d xxx\n", extra);
     ret = 1;
 cleanup:
     free(data);
@@ -430,20 +455,49 @@ Uint32 read_semi_planar_10_tiled4x4(void)
         DIE("Error allocating memory...\n");
         return 0;
     }
-    if (!rd(data, P.y_size * 10 / 8)) {
+    if (!rd(data, P.y_size * 16 / 12)) {
         ret = 0;
         goto cleanup;
     }
-    ten2eight_compact(data, P.raw, P.y_size);
+    int i;
+    for (i = 0; i != 32; i++) {
+        printf("%02x ", data[i]);
+        if ((i + 1) % 16 == 0) {
+            printf("\n");
+        }
+    }
+    ten2eight_tiled(data, P.raw, P.y_size); // correct
+#if 0
+    for (i = 0; i != P.y_size; i++) {
+        if ((i) % 24 == 0) {
+            printf("\n%08x: ", i);
+        }
+        printf("%02x ", P.raw[i]);
+    }
+#endif
+    // skip UV temp
+    /*
     if (!rd(data, (P.cb_size + P.cr_size) * 10 / 8)) {
         ret = 0;
         goto cleanup;
     }
-    ten2eight_compact(data, P.raw + P.y_size, P.cb_size + P.cr_size);
+    ten2eight_tiled(data, P.raw + P.y_size, P.cb_size + P.cr_size);
+    */
 
     // now P.raw is semi_planar_tiled4x4 format
-    de_semi_planar_tile(P.raw, 4, 4);
+    transpose_tile(P.raw, 4, 6);
+#if 0
+    for (i = 0; i != P.y_size; i++) {
+        if ((i) % 24 == 0) {
+            printf("\n%08x: ", i);
+        }
+        printf("%02x ", data[i]);
+    }
+#endif
+    memcpy(data, P.raw, sizeof(Uint8) * P.y_size * 1.5);
+    de_semi_planar_tile(data, 6, 4);
     ret = 1;
+    printf("pass load data\n");
 cleanup:
     free(data);
     return ret;
@@ -589,6 +643,33 @@ Uint32 ten2eight_compact(Uint8 *src, Uint8 *dst, Uint32 length)
     return 1;
 }
 
+// compact ten2eight
+// and drop one byte per 16 byptes
+Uint32 ten2eight_tiled(Uint8 *src, Uint8 *dst, Uint32 length) {
+    unsigned int i;
+#if 0
+    Uint8 *origin = src;
+#endif
+    for (i = 0; i != length; i += 12) {
+        ten2eight_compact(src, dst, 12);
+        src += 16; // 12 * 10 / 8 + 1 = 16
+        dst += 12;
+#if 0
+        if ((src - origin) % (5120 * 1) == 0) {
+            printf("%ld: \n", src - origin);
+            for (int j = 0; j != 128; j++) {
+                printf("%02x ", src[i]);
+                if ((j + 1) % 16 == 0) {
+                    printf("\n");
+                }
+            }
+            src += 128 * 1;
+        }
+#endif
+    }
+    return 1;
+}
+
 // Loose ten2eight
 // every two bytes representation one 10-bit data
 Uint32 ten2eight(Uint8 *src, Uint8 *dst, Uint32 length)
@@ -694,8 +775,8 @@ void draw_grid420(void)
     if (!P.grid) {
         return;
     }
-    draw_grid420_param(16, 8, 0xF0, 0x20);
-    draw_grid420_param(64, 1, 0x90, 0x20);
+// draw_grid420_param(16, 8, 0xF0, 0x20);
+//    draw_grid420_param(64, 1, 0x90, 0x20);
     draw_grid420_param(256, 1, 0xE0, 0x20);
     draw_grid420_param(1024, 1, 0x00, 0x20);
 }
