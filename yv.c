@@ -50,7 +50,9 @@ Uint32 read_planar_vu_422sample(void);
 Uint32 read_planar_vu_444sample(void);
 Uint32 read_semi_planar(void);
 void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height);
+Uint32 read_semi_planar_tiled(Uint32 tw, Uint32 th);
 Uint32 read_semi_planar_tiled4x4(void);
+Uint32 read_semi_planar_tiled8x4(void);
 Uint32 read_semi_planar_10_tiled4x4(void);
 Uint32 read_semi_planar_vu(void);
 Uint32 read_semi_planar_10(void);
@@ -164,7 +166,7 @@ FmtMap gFmtMap[] = {
     [MONO] = {SDL_YV12_OVERLAY, read_mono, draw_yv12, "mono y8 grey y800"},
     [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_422sample, draw_yv12, "yv16 422p"},
     [YUV444P] = {SDL_YV12_OVERLAY, read_planar_vu_444sample, draw_yv12, "444p"},
-    [NV1210] = {SDL_YV12_OVERLAY, read_semi_planar_10, draw_yv12, "nv1210"},
+    [NV1210] = {SDL_YV12_OVERLAY, read_semi_planar_10, draw_yv12, "nv1210 yuv420sp_10bit"},
     [NV12TILED] = {SDL_YV12_OVERLAY, read_semi_planar_tiled4x4, draw_yv12, "yuv420sp_tiled"},
     [NV1210TILED] = {SDL_YV12_OVERLAY, read_semi_planar_10_tiled4x4, draw_yv12, "yuv420sp_tiled_mode0_10bit"},
 };
@@ -392,14 +394,14 @@ void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height) {
         for (j = 0; j != P.width; j++) {
             o = i / tiled_height * tiled_height * P.width;
             o += j / tiled_width * tiled_width * tiled_height;
-            o += i % tiled_height * tiled_height;
+            o += i % tiled_height * tiled_width;
             o += j % tiled_width;
             q = i * P.width + j;
             P.y_data[q] = data[o];
 
             o = i / 2 / tiled_height * tiled_height * P.width;
             o += j / tiled_width * tiled_width * tiled_height;
-            o += i / 2 % tiled_height * tiled_height;
+            o += i / 2 % tiled_height * tiled_width;
             o += j % tiled_width;
             q = i / 2 * P.width / 2 + j / 2;
             P.cr_data[q] = data[o + P.y_size];
@@ -408,18 +410,29 @@ void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height) {
     }
 }
 
-Uint32 read_semi_planar_tiled4x4(void)
+Uint32 read_semi_planar_tiled(Uint32 tw, Uint32 th)
 {
-    Uint8 *data = malloc(sizeof(Uint8) * P.frame_size);
+    Uint32 size = P.frame_size;
+    Uint8 *data = malloc(sizeof(Uint8) * size);
     Uint32 ret = 0;
-    if (!rd(data, P.frame_size)) {
+    if (!rd(data, size)) {
         goto cleanup;
     }
-    de_semi_planar_tile(data, 4, 4);
+    de_semi_planar_tile(data, tw, th);
     ret = 1;
 cleanup:
     free(data);
     return ret;
+}
+
+Uint32 read_semi_planar_tiled4x4(void)
+{
+    return read_semi_planar_tiled(4, 4);
+}
+
+Uint32 read_semi_planar_tiled8x4(void)
+{
+    return read_semi_planar_tiled(8, 4);
 }
 
 Uint32 read_semi_planar_10_tiled4x4(void)
