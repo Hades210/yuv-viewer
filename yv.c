@@ -49,7 +49,7 @@ Uint32 read_planar_vu(void);
 Uint32 read_planar_vu_422sample(void);
 Uint32 read_planar_vu_444sample(void);
 Uint32 read_semi_planar(void);
-void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height);
+void de_semi_planar_tile(Uint8 *data, Uint32 tiled_width, Uint32 tiled_height);
 Uint32 read_semi_planar_tiled(Uint32 tw, Uint32 th);
 Uint32 read_semi_planar_tiled4x4(void);
 Uint32 read_semi_planar_tiled8x4(void);
@@ -167,7 +167,7 @@ FmtMap gFmtMap[] = {
     [YV16] = {SDL_YV12_OVERLAY, read_planar_vu_422sample, draw_yv12, "yv16 422p"},
     [YUV444P] = {SDL_YV12_OVERLAY, read_planar_vu_444sample, draw_yv12, "444p"},
     [NV1210] = {SDL_YV12_OVERLAY, read_semi_planar_10, draw_yv12, "nv1210 yuv420sp_10bit"},
-    [NV12TILED] = {SDL_YV12_OVERLAY, read_semi_planar_tiled4x4, draw_yv12, "yuv420sp_tiled"},
+    [NV12TILED] = {SDL_YV12_OVERLAY, read_semi_planar_tiled8x4, draw_yv12, "yuv420sp_tiled"},
     [NV1210TILED] = {SDL_YV12_OVERLAY, read_semi_planar_10_tiled4x4, draw_yv12, "yuv420sp_tiled_mode0_10bit"},
 };
 
@@ -388,7 +388,9 @@ cleanup:
     return ret;
 }
 
-void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height) {
+#if 0
+// complexity: H * W
+void de_semi_planar_tile(Uint8 *data, Uint32 tiled_width, Uint32 tiled_height) {
     Uint32 i, j, o, q;
     for (i = 0; i != P.height; i++) {
         for (j = 0; j != P.width; j++) {
@@ -409,6 +411,37 @@ void de_semi_planar_tile(Uint8 *data, int tiled_width, int tiled_height) {
         }
     }
 }
+#else
+// complexity: H * W / TW / TH * TH = H * W / TW
+// fast and more easy to understand
+void de_semi_planar_tile(Uint8 *data, Uint32 tiled_width, Uint32 tiled_height) {
+    Uint32 i, j, k, o, q;
+    o = 0;
+    for (i = 0; i < P.height; i += tiled_height) {
+        for (j = 0; j < P.width; j += tiled_width) {
+            // (i, j) one tile's origin
+            for (k = 0; k != tiled_height; k++) {
+                // copy TW data one time instead of byte-to-byte assign
+                memcpy(P.y_data + (i + k) * P.width + j, data + o, tiled_width);
+                o += tiled_width;
+            }
+        }
+    }
+    // convert UV semi-planer to U,V planar, cannot use memcpy way
+    for (i = 0; i != P.height; i++) {
+        for (j = 0; j != P.width; j++) {
+            o = i / 2 / tiled_height * tiled_height * P.width;
+            o += j / tiled_width * tiled_width * tiled_height;
+            o += i / 2 % tiled_height * tiled_width;
+            o += j % tiled_width;
+            q = i / 2 * P.width / 2 + j / 2;
+            P.cr_data[q] = data[o + P.y_size];
+            P.cb_data[q] = data[o + P.y_size + 1];
+        }
+    }
+
+}
+#endif
 
 Uint32 read_semi_planar_tiled(Uint32 tw, Uint32 th)
 {
